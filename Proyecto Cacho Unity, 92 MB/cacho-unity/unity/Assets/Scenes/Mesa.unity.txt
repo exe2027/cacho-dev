@@ -1,0 +1,229 @@
+# MESA — DEFINICIÓN DE ESCENA (TEXTO CLARO)
+#
+# ESTO NO ES UNA ESCENA BINARIA .unity VÁLIDA. Es el documento para
+# recrear la escena en Unity Editor (2022.3 LTS recomendado) siguiendo
+# esta jerarquía, posiciones y materiales. No se pretende que Unity la
+# abra como escena: se construye a mano en el Editor y se guarda como
+# Assets/Scenes/Mesa.unity.
+#
+# ETAPA 1: solo mesa + assets. Sin gameplay, sin reglas, sin
+# animaciones de juego, sin audio, sin red. El script TableLayout.cs
+# posiciona la UI; esta definición fija la jerarquía que ese script
+# espera (los nombres importan: TableLayout busca los hijos de
+# BottomConsole por nombre).
+#
+# DECISIONES DE PARIDAD APLICADAS (docs/19, 26-oct-2026 07:32):
+#   N1: 5 asientos como máximo (2 a 5 por partida).
+#   N2: puestos vacíos LIBRES (marcador, sin avatar ni vaso).
+#   V1: mis dados OCULTOS bajo mi vaso; botón VER = marcador visual.
+#   V2: dados del centro OCULTOS salvo estado de revelación (en esta
+#       etapa no hay lógica que los muestre: nacen inactivos).
+#   V3: solo se define la vista propia.
+#
+# REFERENCIA DE POSICIONES: centros % ancho/alto medidos sobre el
+# mockup (mismas que TableLayout.cs). En la escena 3D las posiciones
+# X/Y se dan en % de pantalla; al recrearla, usar un Canvas en
+# Screen Space - Overlay con Canvas Scaler (Scale With Screen Size,
+# referencia 1920x1080, Match 0.5) y anclar cada RectTransform por su
+# centro % (TableLayout.cs hace exactamente eso en Play).
+#
+# =====================================================================
+# 1. CÁMARA
+# =====================================================================
+# Main Camera
+#   - Projection: Orthographic (la mesa de etapa 1 es UI 2D + mesa 3D
+#     de fondo; la cámara ortográfica evita distorsión de perspectiva
+#     en la composición del mockup).
+#   - Position: (0, 0, -10). Rotation: identidad. Size: 5.
+#   - Clear Flags: Solid Color. Background: #0D0906 (fondo de sala
+#     oscuro, como el fondo de taberna desenfocada del mockup; la
+#     textura de sala llega con el asset room_dorado, ver
+#     ASSETS_NEEDED.md).
+#   - Culling Mask: Default + UI.
+#   - Sin Cinemachine en etapa 1 (las cámaras de juego son etapa 2+).
+#
+# =====================================================================
+# 2. LUCES (HORNEADAS — docs/18 §1: hornear texturas y luces)
+# =====================================================================
+#   - NO hay luces dinámicas en tiempo real en etapa 1.
+#   - Directional Light "LuzTaberna" (INTENSIDAD BAJA, cálida
+#     #FFD9A0): solo para hornear; en la escena final queda como
+#     luz horneada (baked) o apagada, no en tiempo real.
+#   - La iluminación visible de etapa 1 viene HORNEADA en las texturas
+#     de Blender (mesa, vasos, dados): sombras suaves bajo vasos y
+#     dados, brillo del paño y del borde de madera pintados en la
+#     textura, no calculados en el móvil (rendimiento §6 docs/18:
+#     60 fps en gama media).
+#   - Las velas / polvo / humo / reflejos en movimiento son AMBIENTE
+#     de etapa 2+ (catálogo §3 docs/18), NO de esta etapa.
+#
+# =====================================================================
+# 3. JERARQUÍA DE GAMEOBJECTS
+# =====================================================================
+# SceneRoot
+# ├── Main Camera (ver §1)
+# ├── Directional Light "LuzTaberna" (horneado, ver §2)
+# ├── RoomBackground (plano/imagen de fondo)
+# │     Textura: taberna cálida desenfocada (slot room; temporal:
+# │     room_dorado.png de Flutter, ver ASSETS_NEEDED.md).
+# │     Posición: pantalla completa, detrás de todo (orden -10).
+# ├── TableRoot (TableLayout.cs va AQUÍ)
+# │   │
+# │   ├── Canvas (Screen Space - Overlay, orden 0)
+# │   │   ├── TopBar (RectTransform; banda superior, 56 px ref.)
+# │   │   │     Contenido SOLO con datos reales existentes (Flutter
+# │   │   │     hoy) + lo que SE MANTIENE por corrección 09:35: Salir,
+# │   │   │     saldo, Pozo, píldora de turno/apuesta, MICRÓFONO (voz)
+# │   │   │     y MÚSICA/DJ (se mantienen, no se diseñan fuera),
+# │   │   │     historial, ajustes. SIN segunda moneda, SIN "+",
+# │   │   │     SIN regalo, SIN amigos, SIN misiones (C8: solo cuando
+# │   │   │     existan sus funciones, sin botones muertos), SIN chat
+# │   │   │     de TEXTO (C9: fuera; los emotes se quedan, slot en
+# │   │   │     consola). Texto mínimo 14 px (referencia Flutter).
+# │   │   │
+# │   │   ├── TableArea (RectTransform; óvalo/mesa)
+# │   │   │     Marco: madera oscura #2A1A0E, borde grueso (8 px ref.).
+# │   │   │     Filete interior: dorado mate #C9A24B + línea marfil
+# │   │   │     al 20 % (doble filete Flutter R38).
+# │   │   │     Paño por defecto: carbón #171717 centro / #0C0C0C
+# │   │   │     borde (tier Casino 500, definitivo). Otros tiers en
+# │   │   │     TableLayout.ApplyTierFelt().
+# │   │   │     Logo grabado al centro: "CACHO O DUDO" en dos líneas,
+# │   │   │     grabado sutil en el paño (textura, no texto UI
+# │   │   │     superpuesto). El centro queda LIMPIO de dados en
+# │   │   │     reposo (V2).
+# │   │   │     Geometría Flutter ref.: tableTop 56, tableW =
+# │   │   │     screenW - 32, márgenes laterales 16.
+# │   │   │
+# │   │   ├── PotGroup (columna superior, EN PILA con el asiento
+# │   │   │     superior-central — corrección 09:35, 6 asientos, CERO
+# │   │   │     solapes: avatar superior-central -> su placa -> placa
+# │   │   │     del pozo -> vaso de la columna. Valores provisionales;
+# │   │   │     manda la medición de cajas del render Blender)
+# │   │   │     ├── PotPlate — centro (50 %, 21 %): placa "POZO"
+# │   │   │     │     + monto real (en etapa 1, texto marcador
+# │   │   │     │     "2.500" = El Casino 500 x 5, dato de paridad
+# │   │   │     │     Flutter, NO cifra del mockup).
+# │   │   │     └── PotCup — centro (50 %, 29 %): vaso de la columna
+# │   │   │           superior (slot glTF vaso_cuero; TODO, ver
+# │   │   │           ASSETS_NEEDED). Medición mockup original de
+# │   │   │           esa columna: placa 50/6, vaso 51/21 (antes del
+# │   │   │           6º asiento; desplazados para cero solapes).
+# │   │   │
+# │   │   ├── SeatTopCenter (centro 50 %, 10 %) — corrección 09:35
+# │   │   ├── SeatTopLeft (centro 13 %, 16 %)
+# │   │   ├── SeatTopRight (centro 87 %, 16 %)
+# │   │   ├── SeatMidLeft (centro 17 %, 49 %)
+# │   │   ├── SeatMidRight (centro 87 %, 49 %)
+# │   │   └── SeatMe (centro 50 %, 60 %)
+# │   │         Cada asiento (salvo puesto libre):
+# │   │           ├── Avatar (círculo, aro de color de identidad;
+# │   │           │     en mi turno el círculo entero toma el
+# │   │           │     semáforo — eso es lógica de etapa 2, aquí
+# │   │   │           │     solo el aro base)
+# │   │   │           ├── Plate (placa DEBAJO del avatar: nombre +
+# │   │   │           │     conteo de dados, como Flutter hoy.
+# │   │   │           │     Nivel y fichas en placa: ABIERTO, ver
+# │   │   │           │     PARIDAD.md — no se inventa un nivel)
+# │   │   │           └── Cup (vaso rival; centros: 26/24, 74/24,
+# │   │   │                 23/53, 78/53; con posavasos; mi vaso es
+# │   │   │                 más grande — docs/18 §2)
+# │   │         Puesto libre (N2): FreeSeatMarker en lugar del
+# │   │         asiento (silueta vacía, sin avatar, sin vaso, sin
+# │   │         placa). seatCount en TableLayout (2 a 6) decide
+# │   │         cuántos de los 6 asientos están activos.
+# │   │   │
+# │   │   ├── MyCupGroup (mi vaso, objeto LEVANTABLE)
+# │   │   │     Mi vaso (centro 50 %, 52 %; más grande que los
+# │   │   │     rivales) con posavasos. "Levantable" significa: el
+# │   │   │     objeto existe como pieza separada, con su pivote
+# │   │   │     para levantarse en la animación VER de etapa 2.
+# │   │   │     En etapa 1 NO se levanta (no hay lógica VER).
+# │   │   │     └── MyDiceHidden (V1): mis 5 dados, HIJOS de mi vaso,
+# │   │   │           GameObject INACTIVO en reposo. Solo VER los
+# │   │   │           muestra (etapa 2). Nada de dados visibles
+# │   │   │           junto al vaso en reposo (eso era Flutter
+# │   │   │           antes de la decisión 07:32 y quedó atrás).
+# │   │   │
+# │   │   ├── CenterDiceGroup (V2 actualizada B6): dados al centro
+# │   │   │     (centro 50 %, 40 %), GameObject INACTIVO en reposo.
+# │   │   │     Solo se activa en estado de revelación, en CUALQUIER
+# │   │   │     resolución (Dudo, Calzo, duda de Paso, Kamikaze).
+# │   │   │     REVELACIÓN LEGIBLE (corrección 09:35, manda): ningún
+# │   │   │     dado mostrado puede ser pequeño e ilegible; todo dado
+# │   │   │     visible se lee a tamaño real, sin solapes, con los que
+# │   │   │     cuentan destacados uno a uno. NUNCA una revelación con
+# │   │   │     todas las manos en pequeño al centro (eso ya fue
+# │   │   │     rechazado por ilegible). En esta etapa nunca se
+# │   │   │     activa: no hay lógica de revelación.
+# │   │   │
+# │   │   ├── VerButton (marcador visual junto a mi vaso,
+# │   │   │     centro 62 %, 52 %): botón visible, SIN lógica en
+# │   │   │     etapa 1. No revela nada todavía. Agitado del celular:
+# │   │   │     RESUELTO B5 (agitar LANZA los dados; VER los mira).
+# │   │   │
+# │   │   ├── PasoChallengeBar (banda sobre la consola, INACTIVA
+# │   │   │     en etapa 1): marcador de la banda de desafío de
+# │   │   │     Paso (P10). Sin lógica, sin texto de desafío real.
+# │   │   │
+# │   │   └── BottomConsole (banda inferior, 72 px ref.; y ≈ 88 %)
+# │   │         Título "APOSTAR" + fila de tiles 1–6 (botones, no
+# │   │         mis dados reales — docs/18 §2) + CALZO / DUDO /
+# │   │         PASO + VER (control obligatorio: mis dados ocultos
+# │   │   │         + VER) + slot de emotes (C9: chat de TEXTO
+# │   │   │         CERRADO; los emotes se quedan dentro, slot en
+# │   │   │         consola, centro X ≈ 8 %. La línea anterior que
+# │   │   │         decía "chat sigue ABIERTO" estaba desactualizada
+# │   │   │         y queda corregida aquí en ronda 3).
+# │   │         Hijos por nombre (los busca TableLayout.cs):
+# │   │           EmotesButton (X ≈ 8 %, C9: chat de texto FUERA), Tile1 (X ≈ 18 %),
+# │   │           Tile2, Tile3, Tile4, Tile5, Tile6 (X ≈ 48 %),
+# │   │           CalzoButton (X ≈ 61 %), DudoButton (X ≈ 77 %),
+# │   │           PasoButton (X ≈ 90 %).
+# │   │         Tiles intermedios 2–5: interpolados entre Tile1 y
+# │   │           Tile6 (paso (48-18)/5 = 6 %): 24 %, 30 %, 36 %,
+# │   │           42 %. Los tiles son solo botones de apuesta.
+# │   │         Colores de respaldo (si falta el sprite PNG):
+# │   │           CALZO #0E7A4F verde, DUDO #B3202A rojo,
+# │   │           PASO #14586B gris azulado.
+# │   │
+# │   └── (fuera del Canvas) TableMesh3D — OPCIONAL etapa 1
+# │         Malla 3D del óvalo de madera + paño (slot mesa glTF)
+# │         colocada detrás del Canvas de UI, como fondo de mesa.
+# │         Si el glTF no está, la mesa es el TableArea 2D con
+# │         mesa_fondo.jpg temporal (ver ASSETS_NEEDED.md).
+#
+# =====================================================================
+# 4. MATERIALES (nombres y valores; las texturas llegan de Blender)
+# =====================================================================
+#   Mat_TableFelt_Casino500: color base #171717, rugosidad alta
+#     (paño mate, sin brillo especular fuerte). Textura horneada con
+#     el logo "CACHO O DUDO" grabado al centro.
+#   Mat_TableFelt_Barrio / _Salon / _Vip / _HighRoller: centros
+#     #0B5D3B / #14324A / #2E1B3A / #4A3512 (ver TableLayout.cs).
+#   Mat_WoodDark: #2A1A0E, borde grueso del óvalo, veta de madera
+#     horneada.
+#   Mat_GoldMatte: #C9A24B, filete interior y acentos (dorado MATE,
+#     no brillante neón).
+#   Mat_LeatherCup: cuero (vasos; 4 colores Flutter existentes como
+#     referencia: café, burdeos, negro, petróleo — el vaso Unity es
+#     modelo propio de Blender, no copia de sprite).
+#   Mat_DieIvory: marfil, pintas oscuras, caras legibles a 390 px
+#     (lección Flutter: pintas agrandadas, no miniatura ilegible).
+#   Mat_Coaster: posavasos oscuro, elipse bajo cada vaso.
+#
+# =====================================================================
+# 5. QUÉ NO HAY EN ESTA ESCENA (y por qué no se finge)
+# =====================================================================
+#   - Ningún GameObject de lógica (motor, turnos, apuestas, dados
+#     aleatorios, bots, red, wallet). No hay scripts de juego.
+#   - Ninguna animación (Animator/Timeline/DOTween llegan en etapa 2,
+#     tras aprobar la 1, y con las decisiones de paridad cerradas).
+#   - Ningún sistema de partículas (velas, polvo, humo, confeti:
+#     ambiente de etapa 2+).
+#   - Ningún menú, lobby, sala, tienda ni progresión (etapas 6-7 y
+#     secuencia propia tras auth; ver PARIDAD.md).
+#   - La escena NO se entrega como .unity binario porque Unity
+#     Editor no está instalado en esta VM (ver README.md §3). Este
+#     documento ES la escena de etapa 1: todo lo que el Editor debe
+#     contener, sin inventar un binario.

@@ -1,0 +1,46 @@
+name: cacho_app
+description: Cacho — el Dudo chileno. Mesa de casino, cachos de cuero, salas en línea y bots.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cacho_engine:
+    path: ../packages/cacho_engine
+  web_socket_channel: ^3.0.1
+  shared_preferences: ^2.3.2
+  sensors_plus: ^6.1.0
+  wakelock_plus: ^1.2.8
+  audioplayers: ^6.4.0
+  flutter_webrtc: ^1.6.2+hotfix.4
+  http: ^1.2.2
+  youtube_player_iframe: ^6.0.2
+  blobatar: ^0.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  fonts:
+    - family: Cinzel
+      fonts:
+        - asset: assets/fonts/Cinzel-Bold.ttf
+          weight: 700
+    - family: CaveatBrush
+      fonts:
+        - asset: assets/fonts/CaveatBrush-Regular.ttf
+    - family: Montserrat
+      fonts:
+        - asset: assets/fonts/Montserrat-Regular.ttf
+        - asset: assets/fonts/Montserrat-Bold.ttf
+          weight: 700
+  assets:
+    - assets/sounds/
+    - assets/images/
+    - assets/images/coins/

@@ -1,0 +1,10 @@
+name: cacho_engine
+description: Motor puro de Cacho (Dudo chileno) — sin UI ni red. Reglas base, Paso, Calzo y Kamikaze, con rodador de dados inyectable para tests deterministas.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.0.0
+
+dev_dependencies:
+  test: ^1.24.0

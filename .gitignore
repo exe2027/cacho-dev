@@ -1,0 +1,37 @@
+# Archivos comprimidos y respaldos pesados
+*.zip
+*.tar.gz
+*.rar
+
+# Flutter & Dart
+toolchain/
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.pub-cache/
+**/.pub/
+
+# Unity
+**/[Ll]ibrary/
+**/[Tt]emp/
+**/[Oo]bj/
+**/[Bb]uild/
+**/[Bb]uilds/
+**/[Ll]ogs/
+**/[Uu]ser[Ss]ettings/
+**/[Mm]emoryCaptures/
+**/*.pidb.meta
+**/*.pdb.meta
+**/*.mdb.meta
+
+# Node.js
+**/node_modules/
+
+# Logs y temporales
+*.log
+*.tmp
+*.swp
+.DS_Store
+Thumbs.db
+audit/**/*.png

@@ -1,0 +1,21 @@
+{
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "description": "Servidor autoritativo de salas de Cacho (Node.js + WebSockets). Puerto JS del motor Dart de packages/cacho_engine, con los mismos códigos de error.",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "src/server.js",
+  "name": "cacho-server",
+  "private": true,
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "type": "module",
+  "version": "0.1.0",
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

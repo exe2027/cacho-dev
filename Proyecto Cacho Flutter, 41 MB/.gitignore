@@ -1,0 +1,14 @@
+# Checkpoint v1.0 — Cacho / Dudo chileno
+# Generados y toolchains locales: NO se versionan (se reconstruyen).
+toolchain/
+**/build/
+**/.dart_tool/
+**/.flutter-plugins-dependencies
+**/.pub-cache/
+server/node_modules/
+# Capturas de auditoría (los scripts .py de audit/ SÍ se versionan).
+audit/**/*.png
+# Misceláneos
+.DS_Store
+*.log
+*.swp
