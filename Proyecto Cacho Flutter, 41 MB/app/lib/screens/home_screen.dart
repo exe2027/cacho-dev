@@ -1178,11 +1178,11 @@ class _HomeScreenState extends State<HomeScreen>
       const Color(0xFF060607), // deep onyx
     ];
     final tierSprites = [
-      'assets/images/card_barrio_tall.png',
-      'assets/images/card_salon_tall.png',
-      'assets/images/card_casino_tall.png',
-      'assets/images/card_vip_tall.png',
-      'assets/images/card_highroller_tall.png',
+      'assets/images/bg_taberna.jpg',
+      'assets/images/bg_boliche.jpg',
+      'assets/images/bg_casino.jpg',
+      'assets/images/bg_mansion.jpg',
+      'assets/images/bg_clubvip.jpg',
     ];
     // Tier icon (progressing elegance)
     final tierIcons = [
@@ -1243,7 +1243,7 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             Positioned.fill(
               child: Opacity(
-                opacity: 0.32,
+                opacity: 0.45,
                 child: Image.asset(
                   sprite,
                   fit: BoxFit.cover,
