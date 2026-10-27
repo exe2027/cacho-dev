@@ -106,7 +106,7 @@ BoxDecoration get feltDecoration => const BoxDecoration(
 BoxDecoration get pubDecoration => const BoxDecoration(
       color: Color(0xFF0D0906),
       image: DecorationImage(
-        image: AssetImage('assets/images/bg_pub.png'),
+        image: AssetImage('assets/images/bg_pub.jpg'),
         fit: BoxFit.cover,
       ),
     );

@@ -46,7 +46,7 @@ BoxDecoration landscapeRoomDecoration(String id) {
     return const BoxDecoration(
       color: Color(0xFF0D0906),
       image: DecorationImage(
-        image: AssetImage('assets/images/bg_pub.png'),
+        image: AssetImage('assets/images/bg_pub.jpg'),
         fit: BoxFit.cover,
       ),
     );
@@ -227,7 +227,7 @@ TierLook tierLookFor(int stake) {
 
 /// Asset de la sala por tema, para miniaturas reales (R12/R19).
 String tableRoomAsset(String id) => switch (id) {
-      tableThemePub => 'assets/images/bg_pub.png',
+      tableThemePub => 'assets/images/bg_pub.jpg',
       tableThemeNeon => 'assets/images/room_neon_dark.png',
       // RONDA 3 (F3f): la miniatura del tema usa la misma
       // taberna difuminada que el fondo de partida.

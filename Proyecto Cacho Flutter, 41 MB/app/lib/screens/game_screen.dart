@@ -821,9 +821,11 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           children: [
             // Fondo 3D de la mesa según el tier/apuesta de la sala
             Positioned.fill(
-              child: Image.asset(
-                _mesaFondoAsset(c.stake),
-                fit: BoxFit.cover,
+              child: RepaintBoundary(
+                child: Image.asset(
+                  _mesaFondoAsset(c.stake),
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
             // Viñeta de la sala sobre la foto, debajo del contenido.
@@ -874,7 +876,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         child: LayoutBuilder(
                           builder: (_, box) {
                             final tableH = box.maxHeight;
-                            return _sketchTable(others, tableH, compact);
+                            return RepaintBoundary(
+                              child: _sketchTable(others, tableH, compact),
+                            );
                           },
                         ),
                       ),
@@ -1842,7 +1846,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       myDiceCount: c.myHand.length,
       consoleH: 72,
     );
-    final tableRect = layout.table;
 
     return Stack(
       clipBehavior: Clip.none,
@@ -3133,82 +3136,4 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       ],
     );
   }
-}
-
-/// Borde del óvalo de la mesa (RONDA 2, F1; RONDA 3, F3g):
-/// elipse continua (no rectángulo redondeado) con trazo de
-/// madera oscura de 10 px centrado en el borde del óvalo, SIN
-/// filete dorado (eliminado en ronda 3: el ejemplo no tiene
-/// ninguno). La imagen ya trae su propio borde de madera; este
-/// trazo lo engrosa arriba/abajo (donde el estirado lo dejaba en
-/// ~24 px, frente a ~31 px del ejemplo a 390) y cierra la
-/// silueta elíptica donde el recorte ClipOval corta la foto.
-/// Solo borde, sin relleno: no tapa paño, asientos ni vasos.
-class _OvalRimPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    // RONDA 3 (F3g): SIN filete dorado (el ejemplo no tiene
-    // ninguno). Medido en código: el trazo dorado era de 1,5 px
-    // (el informe ronda 2 lo describió como 6 px); se elimina
-    // entero, no se adelgaza. El trazo de madera de 10 px sigue
-    // cerrando la silueta elíptica, así que el borde no se rompe:
-    // solo pierde el anillo dorado interior.
-    final rect = Offset.zero & size;
-    final wood = Paint()
-      ..color = const Color(0xFF2A1A0E)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 10;
-    canvas.drawOval(rect, wood);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-/// Pinceladas bajo "DUDO" (RONDA 3, F3h): dos trazos de brocha
-/// ahusados (curvas cuadráticas, sin rectas perfectas) en marfil
-/// pleno — el Opacity 0,35 del logo los deja al tono del texto.
-class _BrushStrokesPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = CachoColors.ivory
-      ..style = PaintingStyle.fill;
-    final p1 = Path()
-      ..moveTo(4, 3.0)
-      ..quadraticBezierTo(36, 0.5, 68, 3.5)
-      ..quadraticBezierTo(36, 7.0, 4, 6.0)
-      ..close();
-    canvas.drawPath(p1, paint);
-    final p2 = Path()
-      ..moveTo(20, 7.5)
-      ..quadraticBezierTo(36, 6.5, 54, 8.0)
-      ..quadraticBezierTo(36, 9.5, 20, 9.0)
-      ..close();
-    canvas.drawPath(p2, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-/// Óvalo fino ABIERTO del logo (RONDA 2, F10): arco elíptico de
-/// ~300° (abertura abajo a la derecha), trazo marfil al 35 %,
-/// sin dorado, sin relleno. El logo es marca de agua plana, no
-/// letrero: opacidad baja y sin sombra.
-class _LogoOvalPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = CachoColors.ivory.withValues(alpha: 0.35)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    final rect = Offset.zero & size;
-    // Arco de 300°: empieza a 20° y termina a 320° (abertura de
-    // 60° abajo a la derecha, en el sentido del giro del texto).
-    canvas.drawArc(rect, 0.35, 5.24, false, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
