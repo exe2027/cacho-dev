@@ -809,7 +809,13 @@ class PlayerSeat extends StatelessWidget {
       ),
     );
     // Pipas de dados: llenas = dados que le quedan (máx 5).
-    final pipsRow = Row(
+    // Orden del usuario, 27-oct: el conteo de dados vuelve a
+    // ser SOLO estos 5 círculos — cada dado perdido se apaga
+    // (círculo tenue) —, sin el texto "×N". Por eso pipsRow ya
+    // no añade el número aunque showDiceNumber sea true: ese
+    // flag queda sin efecto en las placas, para no romper a los
+    // llamadores que todavía lo pasan.
+    final dicePips = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         for (var i = 0; i < 5; i++)
@@ -830,19 +836,9 @@ class PlayerSeat extends StatelessWidget {
               ),
             ),
           ),
-        if (showDiceNumber) ...[
-          const SizedBox(width: 6),
-          Text(
-            '×$diceCount',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: CachoColors.ivory,
-            ),
-          ),
-        ],
       ],
     );
+    final pipsRow = dicePips;
     // Línea media: pastilla EN TURNO, cuenta de desconexión o
     // estado. En landscape no hay pastilla ni estado (los suprime
     // la sentencia); solo sobrevive la cuenta de desconexión.
@@ -883,12 +879,12 @@ class PlayerSeat extends StatelessWidget {
       );
     }
     // Placa del bosquejo (sentencia F1/F6): avatar + nombre en
-    // una línea + segunda línea [saldo real si lo hay + ×N en
-    // azul claro], sin pipas (el número ES el conteo), sin
+    // una línea + segunda línea [saldo real si lo hay + las 5
+    // pipas de dados], sin texto "×N" (27-oct: el conteo vuelve
+    // a ser solo círculos, que se apagan al perder dados), sin
     // pastilla EN TURNO en horizontal (el turno lo dan el aro
     // semáforo y la barra). La cifra de saldo nunca se trunca:
-    // si no cabe a 14 px en 88 px de placa, se omite (aquí se
-    // omite siempre que el texto medido supere el ancho).
+    // si no cabe junto a las pipas, se omite.
     if (sketchPlate) {
       if (!showPlate) {
         return Opacity(
@@ -898,35 +894,23 @@ class PlayerSeat extends StatelessWidget {
       }
       final balanceText =
           balance != null ? coinsText(balance!) : null;
-      final diceText = '×$diceCount';
-      final line2 = balanceText == null
-          ? diceText
-          : '$balanceText · $diceText';
       // Medición honesta de cabida: un TextPainter a 14 px negrita
-      // decide si la cifra cabe; si no, solo queda ×N (la cifra
-      // nunca se trunca ni redondea).
+      // mide la cifra de saldo; solo se muestra si cabe junto a
+      // las pipas (5 círculos ≈ 61 px + gap 4). La cifra nunca se
+      // trunca ni redondea.
       final tp = TextPainter(
         text: TextSpan(
-          text: line2,
+          text: balanceText ?? '',
           style: const TextStyle(
               fontSize: 14, fontWeight: FontWeight.w800),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
       final showBalance =
-          balanceText != null && tp.width <= plateWidth;
+          balanceText != null && tp.width + 65 <= plateWidth;
       const nameStyle = TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w700,
-        height: 1.1,
-        shadows: [
-          Shadow(color: Colors.black87, blurRadius: 5),
-        ],
-      );
-      const countStyle = TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w800,
-        color: CachoColors.diceNumberLight,
         height: 1.1,
         shadows: [
           Shadow(color: Colors.black87, blurRadius: 5),
@@ -962,6 +946,9 @@ class PlayerSeat extends StatelessWidget {
       // Promoción explícita: showBalance implica balanceText no
       // nulo, pero Dart no lo infiere a través del booleano.
       final shownBalance = showBalance ? balanceText : null;
+      // Segunda línea: saldo (si cabe) + las 5 pipas de dados,
+      // sin texto "×N": los círculos apagados son los dados
+      // perdidos (orden del usuario, 27-oct).
       final line2Widget = Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -969,7 +956,7 @@ class PlayerSeat extends StatelessWidget {
             Text(shownBalance, style: balanceStyle),
             const SizedBox(width: 4),
           ],
-          Text(diceText, style: countStyle),
+          dicePips,
         ],
       );
       final dcWidget = !connected && !eliminated && dcDeadlineMs != null
@@ -977,30 +964,36 @@ class PlayerSeat extends StatelessWidget {
           : null;
       Widget plateCol;
       if (singleLinePlate) {
-        // Una línea: conteo primero para no truncarlo nunca.
-        // RONDA 2 (F4/F6): ancho 132 (era 116): "×5 · El Huaso"
-        // a 14 px negrita mide ~118-124 según la fuente real y
-        // en 116 se cortaba ("El Hu…"); en 132 cabe entero y el
-        // Tooltip devuelve el texto completo si un apodo largo
-        // (en línea, hasta 16 caracteres) lo supera.
-        // CORRECCIÓN 2: la caja de 132 por sí sola NO bastó
-        // (captura ronda 2: seguía "El Hu…") porque el
-        // Positioned del llamador era de 88 y su restricción
-        // comprime al hijo; el llamador (_sketchRivalSeat) ya
-        // ensancha el Positioned a 132 (ver allí).
+        // Una línea de alto: las 5 pipas primero y el nombre
+        // después (27-oct: sin "×N"). El ancho 132 se mantiene
+        // (RONDA 2 F4/F6) y el Tooltip devuelve el nombre
+        // completo + el conteo si un apodo largo lo supera.
+        // El Positioned del llamador (_sketchRivalSeat) ya
+        // ensancha a 132, así que la restricción no comprime
+        // al hijo.
         plateCol = Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
               width: 132,
               child: Tooltip(
-                message: '$diceText · $nickname',
-                child: Text(
-                  '$diceText · $nickname',
-                  maxLines: 1,
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
-                  style: nameStyle,
+                message: '$nickname · $diceCount dados',
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    dicePips,
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        nickname,
+                        maxLines: 1,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        style: nameStyle,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

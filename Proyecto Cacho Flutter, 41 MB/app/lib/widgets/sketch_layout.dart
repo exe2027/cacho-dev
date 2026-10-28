@@ -112,7 +112,7 @@ class SketchSeat {
   final SketchRect plate;
   final SketchRect cup;
 
-  /// Placa de una línea ("×5 · nombre") en vez de dos líneas.
+  /// Placa de una línea de alto (pipas + nombre) en vez de dos líneas.
   /// Solo la usa el asiento superior del mockup-6 (ver
   /// `mockupSeat`): su pila avatar+placa debe caber en el hueco
   /// pozo~mi-vaso (80 px a 390), imposible con placa de 34.
@@ -615,9 +615,9 @@ SketchLayout sketchLayout({
       plate = SketchRect(
           'placa-${angle.round()}', scx - 44 + off, avatar.bottom + 2, 88, 34);
     } else if (reference && (angle == 60 || angle == 120)) {
-      // Inferiores de referencia: una sola línea debajo del
-      // avatar, ahora de 120 (no 88): "×5 · El Huaso" a 14 px
-      // mide ~110 y en 88 se cortaba ("El Hu...").
+      // Inferiores de referencia: una sola línea de alto debajo
+      // del avatar, ahora de 120 (no 88): pipas + nombre a 14 px
+      // (antes "×5 · El Huaso" medía ~110 y en 88 se cortaba).
       plate = SketchRect(
           'placa-${angle.round()}', scx - 60, avatar.bottom + 2, 120, 18);
     } else if (reference) {
