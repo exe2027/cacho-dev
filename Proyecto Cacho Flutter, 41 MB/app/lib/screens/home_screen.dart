@@ -2258,6 +2258,12 @@ class _CircularRoomCarouselState extends State<_CircularRoomCarousel>
   }
 
   void _onDragStart(DragStartDetails details) {
+    // Al empezar el arrastre, asegurar el audio: en iOS/Safari
+    // cada reproductor de ticks necesita su AudioContext reanudado
+    // dentro de un gesto (ver AudioService.unlock()); el primer
+    // tack llega al asentarse el paso, ya fuera del gesto, así
+    // que el pool debe estar precalentado aquí, no en el tack.
+    AudioService.instance.unlock();
     // Agarrar el carrusel cancela cualquier fling en curso.
     _pendingSteps = 0;
     _flingTotalSteps = 0;

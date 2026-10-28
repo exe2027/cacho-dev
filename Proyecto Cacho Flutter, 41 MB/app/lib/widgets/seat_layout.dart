@@ -127,16 +127,25 @@ WidgetTableLayout widgetLayoutFor(SketchLayout layout) {
   final compact = layout.tableH < 262;
   final screenW = layout.screenW;
 
-  // Pozo widget: 180×32 centrado, top = top geométrico.
-  final pot = WidgetBox('pozo-widget', layout.pot.cx - 90, layout.pot.top,
-      180, 32);
+  // Pozo widget: ya NO vive encima de la mesa (orden del
+  // usuario: el vaso central lo tapaba); vive en la barra
+  // superior, centrado, 180×28 en y 14..42. Ningún asiento
+  // llega a la barra (avatar superior desde y 60), así que
+  // el pozo es visible siempre por construcción. El rect
+  // geométrico `layout.pot` se conserva como zona de
+  // referencia de la mesa (aterrizaje de la tirada), no como
+  // widget pintado.
+  final pot = WidgetBox('pozo-barra', layout.pot.cx - 90, 14, 180, 28);
 
   final seats = <SeatWidgets>[];
   for (final s in layout.seats) {
-    // Avatar widget: 64 (58 geom + 3 por lado) o 56 (48 geom + 4).
+    // Avatar widget: 64 (58 geom + 3 por lado), 56 (48 geom +
+    // 4) o 48 (40 geom + 4, asiento superior angosto).
     final avatarIs48 = s.avatar.width == 48;
-    final avatarW = avatarIs48 ? 56.0 : 64.0;
-    final avatarOff = avatarIs48 ? 4.0 : 3.0;
+    final avatarW = s.avatar.width == 40
+        ? 48.0
+        : (avatarIs48 ? 56.0 : 64.0);
+    final avatarOff = s.avatar.width == 40 ? 4.0 : (avatarIs48 ? 4.0 : 3.0);
     final avatar = WidgetBox('avatar-${s.angleDeg.round()}',
         s.avatar.left - avatarOff, s.avatar.top - avatarOff, avatarW, avatarW);
     // Placa widget: 132 de ancho CENTRADA en el centro geométrico
@@ -149,13 +158,28 @@ WidgetTableLayout widgetLayoutFor(SketchLayout layout) {
     // "El H…". En game_screen la superior pasa a plateW 180 y
     // en dice_and_cup su nombre va a 12 px con pipas de 7 px
     // (161 px de contenido ≤ 180).
-    final plateW = s.singleLinePlate ? 180.0 : 132.0;
+    // Placa widget: 180 de una línea (superior normal), 132
+    // de dos líneas, 150 de una línea en laterales angostos
+    // (< 700, mesa corta) y 120 de dos líneas en el bolsillo
+    // angosto (placa a la izquierda del avatar).
+    final plateW = s.narrowPlate
+        ? (s.angleDeg == 270 ? 120.0 : 150.0)
+        : (s.singleLinePlate ? 180.0 : 132.0);
+    // La placa real se centra en el centro geométrico pero con
+    // tope a los bordes (igual que `_sketchRivalSeat` en
+    // game_screen: max(0, min(cx − w/2, screenW − w))): sin el
+    // tope, el modelo marcaba placas fuera de pantalla que en
+    // vivo están recortadas al borde.
+    final plateLeft =
+        (s.plate.cx - plateW / 2).clamp(0.0, screenW - plateW);
     final plate = WidgetBox(
         'placa-${s.angleDeg.round()}',
-        s.plate.cx - plateW / 2,
+        plateLeft,
         s.plate.top + 4,
         plateW,
-        s.singleLinePlate ? 21 : 34);
+        (s.narrowPlate && s.angleDeg == 270)
+            ? 34
+            : (s.singleLinePlate ? 21 : 34));
     // Vaso: cuerpo geométrico (el posavasos no es información).
     final cup = WidgetBox('vaso-${s.angleDeg.round()}', s.cup.left,
         s.cup.top, s.cup.width, s.cup.height);
@@ -212,8 +236,9 @@ WidgetTableLayout widgetLayoutFor(SketchLayout layout) {
 ///   (8 px): se inflan ambos rectángulos unión en slotMargin/2
 ///   y no deben solaparse.
 /// - dentro de cada slot: avatar~placa y avatar~vaso y
-///   placa~vaso no se solapan (sin margen: el vaso va al
-///   costado exterior y la placa justo debajo del avatar).
+///   placa~vaso no se solapan (sin margen: corrección 28-oct,
+///   el avatar va al costado exterior, el vaso hacia el centro
+///   y la placa justo debajo del avatar).
 /// - pozo y mi vaso contra todo lo demás: sin solape.
 /// - mis dados contra pozo, avatares y nameplates: separación
 ///   mínima [diceGap] (12 px), en al menos un eje.
@@ -314,6 +339,40 @@ List<String> checkWidgetLayout(WidgetTableLayout w,
     }
   }
   return violations;
+}
+
+/// Solapes de ELEMENTO (sin el proxy de uniones de slot): la
+/// regla del usuario es que ningún elemento tape a otro. En mesa
+/// corta el asiento 270 vive en un bolsillo pegado a mi slot y
+/// las uniones se acercan a 1–6 px, así que el margen de unión
+/// no es exigible ahí; lo exigible —y lo que este chequeo
+/// afirma— es que ningún par de elementos se solape (salvo
+/// mis dados bajo mi vaso, peek por diseño).
+List<String> checkElementOverlaps(WidgetTableLayout w) {
+  final boxes = [
+    w.pot,
+    for (final s in w.seats) ...[s.avatar, s.plate, s.cup],
+    w.myCup,
+    w.myAvatar,
+    w.myPlate,
+    ...w.myDice,
+  ];
+  final out = <String>[];
+  for (var i = 0; i < boxes.length; i++) {
+    for (var j = i + 1; j < boxes.length; j++) {
+      final a = boxes[i];
+      final b = boxes[j];
+      if ((a.label.startsWith('dado') && b.label == 'mi-vaso') ||
+          (b.label.startsWith('dado') && a.label == 'mi-vaso')) {
+        continue;
+      }
+      if (a.overlaps(b)) {
+        out.add('${a.label} ~ ${b.label} = '
+            '${a.overlapArea(b).toStringAsFixed(0)} px²');
+      }
+    }
+  }
+  return out;
 }
 
 /// Función de debug pedida: calcula las huellas, comprueba

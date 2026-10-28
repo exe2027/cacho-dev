@@ -50,7 +50,7 @@ void main() {
 
     test('el escalonado no alarga el lanzamiento: todos terminan en 1',
         () {
-      // A t=0.05 solo arrancó el dado 0 (el 1 arranca en 0.06); a t=1
+      // A t=0.05 solo arrancó el dado 0 (el 1 arranca en 0.08); a t=1
       // todos terminaron juntos.
       for (var i = 0; i < 5; i++) {
         expect(diceThrowLocalProgress(0.05, i, 5),

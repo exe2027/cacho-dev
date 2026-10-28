@@ -359,32 +359,40 @@ class PasoChallengeBar extends StatelessWidget {
 /// construcción no tapa dados, vaso, consola ni barra superior, y
 /// la mesa se achica 44 px en vez de quedar tapada. VER (44 px de
 /// alto, etiqueta VER + ojo) es el ÚNICO mecanismo de revelación
-/// en horizontal; las 5 reacciones son botones de 44 px. En línea
-/// las reacciones están deshabilitadas (relay del servidor
-/// pendiente; enviar provocaría `mensaje_invalido`): el tooltip lo
-/// dice, no se finge que los demás las ven.
+/// en horizontal y solo se muestra cuando sirve (fase de juego y
+/// mano propia por revelar: `showVer`); si no sirve, la tira
+/// queda solo con el botón de chat/reacciones. Las reacciones y
+/// el chat viven en UN solo botón desplegable de 44 px que abre
+/// el panel "CHAT RÁPIDO & REACCIONES" (layout-sin-solapes: las
+/// 5 reacciones en línea tapaban mi placa y el botón flotante
+/// de chat tapaba la consola; ambos desaparecen y queda esta
+/// única entrada, en fila, sin solapar nada). En línea las
+/// reacciones están deshabilitadas (relay del servidor
+/// pendiente; enviar provocaría `mensaje_invalido`): el tooltip
+/// del panel lo dice, no se finge que los demás las ven.
 class VerEmoteStrip extends StatelessWidget {
   final MatchController controller;
   final bool verOpen;
   final VoidCallback onVerTap;
+
+  /// false cuando no hay mano propia por revelar (p. ej.
+  /// eliminado con 0 dados): VER se oculta, el botón de chat
+  /// queda.
+  final bool showVer;
+
+  /// Abre el panel de chat/reacciones.
+  final VoidCallback onChatTap;
   const VerEmoteStrip({
     super.key,
     required this.controller,
     required this.verOpen,
     required this.onVerTap,
+    this.showVer = true,
+    required this.onChatTap,
   });
-
-  static const _labels = {
-    '😂': '¡Qué risa!',
-    '👏': '¡Bravo!',
-    '👍': 'Bien jugado',
-    '😮': '¡No puede ser!',
-    '🔥': '¡En llamas!',
-  };
 
   @override
   Widget build(BuildContext context) {
-    final c = controller;
     // RONDA 2 corrección 2 (F4, medida en captura): fondo
     // TRANSPARENTE (era barra opaca 0xFF14100C de ancho
     // completo). La tira pinta DESPUÉS de la mesa en la Column
@@ -400,8 +408,9 @@ class VerEmoteStrip extends StatelessWidget {
       color: Colors.transparent,
       child: Row(
         children: [
-          Semantics(
-            label: verOpen ? 'Ocultar tus dados' : 'Ver tus dados',
+          if (showVer)
+            Semantics(
+              label: verOpen ? 'Ocultar tus dados' : 'Ver tus dados',
             button: true,
             child: Material(
               color: verOpen ? CachoColors.gold : const Color(0xFF1B2434),
@@ -440,34 +449,28 @@ class VerEmoteStrip extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              reverse: true,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (final glyph in MatchController.emotes)
-                    SizedBox(
-                      width: 44,
-                      height: 44,
-                      child: Tooltip(
-                        message: _labels[glyph] ?? glyph,
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            customBorder: const CircleBorder(),
-                            onTap: () => c.sendEmote(glyph),
-                            child: Center(
-                              child: Text(glyph,
-                                  style: const TextStyle(fontSize: 24)),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
+          if (showVer) const SizedBox(width: 8),
+          const Spacer(),
+          // Único botón de chat/reacciones (44 px, en fila, no
+          // flotante sobre la consola): abre el mismo panel
+          // que antes abría el botón flotante.
+          Semantics(
+            label: 'Chat y reacciones',
+            button: true,
+            child: Material(
+              color: const Color(0xFF1B2434),
+              shape: const CircleBorder(
+                  side: BorderSide(color: CachoColors.gold, width: 1.5)),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onChatTap,
+                child: const SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Center(
+                    child: Text('💬', style: TextStyle(fontSize: 22)),
+                  ),
+                ),
               ),
             ),
           ),

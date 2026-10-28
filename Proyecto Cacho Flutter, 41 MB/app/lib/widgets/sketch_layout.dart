@@ -12,8 +12,9 @@ import 'dart:math' as math;
 /// - CORRECCIÓN 26-oct (mockup-6, ≤5 rivales): puestos FIJOS, no
 ///   elipse: superior-izquierda, superior-derecha,
 ///   inferior-izquierda, inferior-derecha, centro arriba (en ese
-///   orden de ocupación); costados con avatar 58, placa 88×34
-///   SIEMPRE DEBAJO, vaso 56×64 hacia fuera; asiento superior con
+///   orden de ocupación); costados con avatar 58 FUERA, placa
+///   88×34 SIEMPRE DEBAJO del avatar, vaso 56×64 hacia el
+///   centro (corrección 28-oct, antes al revés); asiento superior con
 ///   avatar 48 + placa de una línea 88×18 (el hueco pozo~mi-vaso
 ///   no da para más) y vaso a su derecha junto al avatar
 ///   (CORRECCIÓN 27-oct, sin solapes widget: centro cx + 76,
@@ -121,8 +122,16 @@ class SketchSeat {
   /// `mockupSeat`): su pila avatar+placa debe caber en el hueco
   /// pozo~mi-vaso (80 px a 390), imposible con placa de 34.
   final bool singleLinePlate;
+
+  /// Modo angosto (pantalla < 700 en mesa corta, corrección
+  /// layout-sin-solapes): las placas laterales de una línea
+  /// pasan de 180 a 150 px, y la placa del bolsillo 270 pasa a
+  /// 120 px de dos líneas a la IZQUIERDA de su avatar (no
+  /// debajo del vaso: ahí chocaría con la placa lateral
+  /// inferior y con mi avatar). Ver `sketchLayout`.
+  final bool narrowPlate;
   const SketchSeat(this.angleDeg, this.avatar, this.plate, this.cup,
-      {this.singleLinePlate = false});
+      {this.singleLinePlate = false, this.narrowPlate = false});
 }
 
 class SketchLayout {
@@ -233,6 +242,15 @@ List<double> sketchAngles(int rivals) {
 /// superior-derecha, inferior-izquierda, inferior-derecha, centro
 /// arriba. Con menos rivales los puestos vacíos quedan libres: la
 /// lista es un prefijo, nunca se rebalancea.
+/// CORRECCIÓN 28-oct (usuario, foto en vivo): en los laterales
+/// el AVATAR va FUERA y el VASO DENTRO. Antes el vaso iba 62 px
+/// hacia fuera y el avatar quedaba sobre el paño; ahora el avatar
+/// va 62 px hacia fuera y el vaso ocupa el sitio del avatar
+/// (hacia el centro), con la placa siempre debajo del avatar.
+/// La distancia avatar~vaso sigue siendo 62 (hueco geométrico
+/// 2 px al avatar widget de 64, igual que antes) y no hay
+/// solapes nuevos: el vaso queda 5 px sobre la placa en
+/// geométrico y la placa widget 5 px bajo el vaso widget.
 List<double> mockupAngles(int rivals) {
   const order = [225.0, 315.0, 135.0, 45.0, 270.0];
   if (rivals <= 0) return [];
@@ -241,7 +259,8 @@ List<double> mockupAngles(int rivals) {
 
 /// Un asiento de la rama mockup-6 (geometría medida, ver informe
 /// `audit/correccion_6jugadores_mesa.md`). Costados: avatar 58×58,
-/// placa 88×34 SIEMPRE DEBAJO, vaso 56×64 hacia fuera en x (±67),
+/// placa 88×34 SIEMPRE DEBAJO del avatar, avatar 58×58 hacia
+/// fuera en x (±62) y vaso 56×64 hacia el centro (28-oct),
 /// anclados a `sideCy` (cy − 18: compensa que la placa va debajo)
 /// con separación vertical 52. Asiento superior central: el hueco
 /// pozo~mi-vaso es de solo 80 px a 390 (pozo hasta 94, mi vaso
@@ -260,6 +279,32 @@ List<double> mockupAngles(int rivals) {
 /// residuo medido, ver informe. En mesa corta (206) la placa se
 /// corre a la izquierda (left = cx − 200), siempre debajo del
 /// avatar, limpia de mi vaso y mis dados.
+///
+/// CORRECCIÓN 28-oct (mesa corta, iPhone apaisado: la mesa real
+/// baja a 180–210 px porque la columna tiene barra 56 + tira VER
+/// 44 + consola ~110–130, y ahí la columna central se apilaba:
+/// mi vaso tocaba al avatar-270 en 1144 px² a mesa 180 y las
+/// placas inferiores desbordaban bajo la mesa, donde la tira VER
+/// y la consola las tapan). En mesa corta (`shortMode`, tableH <
+/// 262) NO se apila nada en el centro:
+/// - Mi vaso ya NO se achica: 64×72 siempre (orden del usuario:
+///   mi vaso nunca menor que el rival, 56×64). El compacto solo
+///   achica mis dados, no el vaso.
+/// - Laterales en corto: avatar 48 + placa de UNA línea (21 px
+///   en widget) para que la pila lateral quepa sin que la placa
+///   superior toque al avatar inferior (separación mínima
+///   2×sideDy − 79 ≥ 1 con sideDy ≥ 40).
+/// - El asiento 270 se REUBICA en un bolsillo a la izquierda del
+///   pozo (centro `pocketCx`, fórmula en `sketchLayout`): pila
+///   vertical avatar 48 → vaso 56×64 → placa de una línea,
+///   con la placa widget de 180 px. Compromiso documentado:
+///   la placa del 270 ya no va debajo de su avatar sino debajo
+///   de su vaso, porque debajo del avatar chocaría con el vaso
+///   lateral superior; y en la anchura mínima (844) la placa
+///   queda a 1–2 px de mi avatar (sin tocarlo) y a ~11 px del
+///   vaso lateral. Los solapes de ELEMENTO son 0; la unión de
+///   slots (proxy) del 270 con mi slot se acerca, así que el
+///   test de mesa corta comprueba elementos, no uniones.
 SketchSeat mockupSeat({
   required double angle,
   required double cx,
@@ -268,7 +313,72 @@ SketchSeat mockupSeat({
   required double sideX,
   required double tableTop,
   required double myCupTop,
+  bool shortMode = false,
+  double pocketCx = 0,
+  bool pocketNarrow = false,
+  double screenW = 844,
+  int myDiceCount = 5,
 }) {
+  if (angle == 270 && shortMode && pocketNarrow) {
+    // Asiento superior ANGOSTO (< 700, mesa corta): ni el
+    // bolsillo izquierdo ni la pila central caben. La columna
+    // central (pozo + mi vaso + mi asiento) no deja hueco
+    // vertical para avatar+placa+vaso, y el bolsillo izquierdo
+    // choca con el asiento lateral superior (su avatar, su
+    // vaso y su placa ocupan x 0..180 en y 48..150). Solución
+    // medida a 600–699: FILA SUPERIOR — placa 120 × 34 de dos
+    // líneas a la izquierda, avatar 40 centrado arriba (su
+    // widget de 48 toca justo el borde inferior de la barra
+    // y el borde superior de mi vaso, sin solapar ninguno) y
+    // vaso 56 × 64 a la derecha, sujeto entre mi banda de
+    // dados (izquierda + 9) y la placa lateral derecha
+    // (derecha − 73). A 640: placa 172..292, avatar widget
+    // 296..344, vaso widget 384..457, dados hasta 383, placa
+    // lateral derecha desde 490: 0 solapes. El avatar sigue
+    // siendo el del asiento superior y su vaso no tapa la
+    // placa; la única concesión es el avatar 40 (no 48) y la
+    // placa a la izquierda (no debajo), solo en angosto.
+    final avatarLeft = cx - 20;
+    final avatarTop = tableTop + 4;
+    final rightPlateLeft =
+        (cx + sideX + 62 - 75).clamp(0.0, screenW - 150.0);
+    final diceRight =
+        cx + (myDiceCount * 22.0 + (myDiceCount - 1) * 4.0) / 2;
+    final cupLeft =
+        math.min(math.max(cx + 72, diceRight + 9), rightPlateLeft - 73);
+    return SketchSeat(
+      angle,
+      SketchRect('avatar-270', avatarLeft, avatarTop, 40, 40),
+      SketchRect('placa-270', avatarLeft - 8 - 120, avatarTop + 3,
+          120, 34),
+      SketchRect('vaso-270', cupLeft, tableTop + 56, 56, 64),
+      singleLinePlate: false,
+      narrowPlate: true,
+    );
+  }
+  if (angle == 270 && shortMode) {
+    // Bolsillo de mesa corta: avatar arriba, vaso en medio,
+    // placa de una línea abajo. Coordenadas de pantalla
+    // (tableTop = 56): avatar widget 0..56, vaso widget 58..130,
+    // placa widget desde 130 en relativo a la mesa; mi vaso
+    // (40..112 a mesa 180) queda a ≥58 px del vaso del bolsillo
+    // en x y la placa a 1–2 px de mi avatar (sin tocarlo).
+    // La placa BAJA con la mesa (myCupTop + 71): la banda de
+    // mis dados está en myCup.bottom − 31 y a mesa 208–250
+    // cruzaría una placa fija en 130..151 (solape medido);
+    // bajándola, el hueco dados~placa queda en 12 px y el
+    // hueco placa~mi-vaso en 3 px, sin tocar nada.
+    final avatarTop = tableTop + 4;
+    final plateTop =
+        math.max(tableTop + 126, myCupTop + 71);
+    return SketchSeat(
+      angle,
+      SketchRect('avatar-270', pocketCx - 24, avatarTop, 48, 48),
+      SketchRect('placa-270', pocketCx - 44, plateTop, 88, 18),
+      SketchRect('vaso-270', pocketCx - 28, tableTop + 62, 56, 64),
+      singleLinePlate: true,
+    );
+  }
   if (angle == 270) {
     // Pila corta (ver cabecera): avatar 48 + placa de una línea.
     // Centrada si cabe sobre mi vaso; si no (mesa corta), corrida
@@ -315,27 +425,55 @@ SketchSeat mockupSeat({
   final upper = angle == 225 || angle == 315;
   final scx = left ? cx - sideX : cx + sideX;
   final scy = upper ? sideCy - sideDy : sideCy + sideDy;
-  // CORRECCIÓN 27-oct (sin solapes, orden del usuario: "los
-  // cachos de los lados invaden el centro"): TODOS los vasos
-  // laterales van hacia FUERA (exterior de la mesa), nunca
-  // hacia el centro. La RONDA 2 (F3) los ponía hacia dentro
-  // arriba y eso, con la placa widget real de 132 px, hacía
-  // que el vaso superior-derecho tapara al vaso superior
-  // central en widget (geometría limpia, widget no). Hacia
-  // fuera, el vaso queda separado de su placa por la
-  // separación vertical (vaso abajo ≤ placa arriba − 3 px en
-  // widget, ver seat_layout.dart) y no invade el centro.
-  // Contrapartida honesta: a mesa corta el vaso superior
-  // exterior queda en parte fuera del óvalo de la foto (el
-  // óvalo se estrecha arriba); no tapa a ningún jugador.
-  // Offset 62 (no 67): hueco 5 px geométrico al avatar.
-  final cupCx = left ? scx - 62 : scx + 62;
-  final cupTop = upper ? scy - 4 - 32 : scy - 6 - 32;
+  // CORRECCIÓN 28-oct (usuario, foto en vivo: "el vaso
+  // dentro de la mesa y el avatar fuera"): se INVIERTE el orden
+  // lateral. La corrección 27-oct ponía TODOS los vasos hacia
+  // fuera (orden de entonces: "los cachos de los lados invaden
+  // el centro"); en la foto eso dejó al avatar sobre el paño y
+  // al vaso en el borde exterior, al revés de lo que el usuario
+  // quiere. Ahora el AVATAR va 62 px hacia fuera y el VASO
+  // ocupa el sitio del avatar (hacia el centro), con la placa
+  // siempre debajo del avatar (centrada en el avatar nuevo, no
+  // en el centro del asiento viejo). La distancia avatar~vaso
+  // sigue siendo 62 y el hueco geométrico al avatar widget
+  // sigue siendo 2 px; el vaso queda 5 px sobre la placa en
+  // geométrico (cupTop unificado a scy − 6 − 32: con el
+  // −4 viejo de los superiores, el vaso widget quedaba 1 px
+  // dentro de la placa widget tras el intercambio).
+  // Contrapartida honesta: a mesa corta el avatar exterior
+  // queda en parte fuera del óvalo de la foto (el óvalo se
+  // estrecha arriba); no tapa a ningún jugador.
+  // Asiento superior (270): NO se puede apilar vaso bajo la
+  // placa en vertical — el hueco pozo~mi-vaso es de solo 88 px
+  // (pozo hasta 94, mi vaso desde 178) y avatar 48 + placa
+  // widget 21 + vaso widget 72 + separaciones superan los
+  // 140 px: el vaso bajo la placa chocaría con mi vaso o con
+  // el pozo. El superior queda como está (vaso al costado del
+  // avatar, sin tapar avatar ni placa); el intercambio
+  // avatar-fuera/vaso-dentro rige para los 4 laterales, que
+  // son los que el usuario marcó en rojo en la foto.
+  final avatarCx = left ? scx - 62 : scx + 62;
+  final cupTop = scy - 6 - 32;
+  if (shortMode) {
+    // Mesa corta: avatar 48 + placa de una línea (widget 180×21)
+    // para que la pila lateral quepa: placa widget top =
+    // scy+30, bottom = scy+51; avatar widget top = scy−28, así
+    // que placa superior ~ avatar inferior exige 2×sideDy ≥ 79
+    // (sideDy ≥ 40 en `sketchLayout`). El vaso no se toca.
+    return SketchSeat(
+      angle,
+      SketchRect('avatar-${angle.round()}', avatarCx - 24, scy - 24, 48, 48),
+      SketchRect('placa-${angle.round()}', avatarCx - 44, scy + 26, 88, 18),
+      SketchRect('vaso-${angle.round()}', scx - 28, cupTop, 56, 64),
+      singleLinePlate: true,
+      narrowPlate: pocketNarrow,
+    );
+  }
   return SketchSeat(
     angle,
-    SketchRect('avatar-${angle.round()}', scx - 29, scy - 29, 58, 58),
-    SketchRect('placa-${angle.round()}', scx - 44, scy + 31, 88, 34),
-    SketchRect('vaso-${angle.round()}', cupCx - 28, cupTop, 56, 64),
+    SketchRect('avatar-${angle.round()}', avatarCx - 29, scy - 29, 58, 58),
+    SketchRect('placa-${angle.round()}', avatarCx - 44, scy + 31, 88, 34),
+    SketchRect('vaso-${angle.round()}', scx - 28, cupTop, 56, 64),
   );
 }
 
@@ -516,13 +654,14 @@ SketchLayout sketchLayout({
   // Mi vaso y mis dados (banda inferior, hueco 104).
   final tableBottom = tableTop + tableH;
   final myCupBottom = tableBottom - 68;
-  // CORRECCIÓN 27-oct: vaso propio 72/44 (no 76/52) para que
-  // en compacto no toque la placa superior widget (su borde
-  // inferior quedaba 5 px dentro de mi vaso) y en completo
-  // quede aire con ella; el fondo sigue siendo tableBottom−68
-  // y el hueco a mi avatar (4 px) no cambia.
-  final myCupH = compact ? 44.0 : 72.0;
-  final myCupW = compact ? 44.0 : 64.0;
+  // CORRECCIÓN 28-oct (orden del usuario): mi vaso es 64×72
+  // SIEMPRE, nunca menor que el vaso rival (56×64). El
+  // compacto 44×44 viejo es justo lo que el usuario vio en
+  // iPhone apaisado (totalH < 390) y prohibió. El compacto
+  // solo achica mis dados, no el vaso; la mesa corta se
+  // resuelve reubicando el asiento 270 (ver `shortMode`).
+  final myCupH = 72.0;
+  final myCupW = 64.0;
   final myCup = SketchRect(
       'mi-vaso', cx - myCupW / 2, myCupBottom - myCupH, myCupW, myCupH);
   final dieSize = compact ? 20.0 : 34.0;
@@ -578,16 +717,68 @@ SketchLayout sketchLayout({
   // suba sobre la barra (top ≥ tableTop + 2). A mesa 178 el tope
   // manda y las placas inferiores desbordan bajo la mesa: residuo
   // medido, ver informe (a 390 y a mesa 206/250 no ocurre).
-  final double mockupSideDy = screenH > 390
-      ? (tableH * 0.22).clamp(58.0, 95.0)
-      : 58.0;
+  //
+  // CORRECCIÓN 28-oct, mesa corta (`shortMode` = tableH < 262,
+  // la mesa real de un iPhone apaisado): sideDy es
+  // máx(51, tableH×0,22) — la placa superior widget (180 px)
+  // contra el vaso inferior widget exige 2×sideDy ≥ 93 para
+  // no tocarse (medido: con 40 se solapaban en 20 px²) — y
+  // sideX sube a ≥260–262 para que quepa el bolsillo del 270
+  // entre el vaso lateral y el pozo (ver `pocketCx`). Sin esto,
+  // a mesa 180–206 la columna central se apilaba y las placas
+  // inferiores caían bajo la mesa, tapadas por la tira VER y
+  // la consola (que pintan después del Expanded).
+  final bool shortMode = tableH < 262;
+  final double mockupSideDy = shortMode
+      ? math.min(math.max(51.0, tableH * 0.22), tableH / 2 - 35)
+      : (screenH > 390
+          ? (tableH * 0.22).clamp(58.0, 95.0)
+          : 58.0);
   // En pantallas anchas (> 844), distribuir los asientos a lo largo de las curvas
   // de la mesa como en el mockup (arreglo.md §3/§5), conservando 262 en 844.
-  final double mockupSideX = screenW > 844
+  double mockupSideX = screenW > 844
       ? (screenW / 2 - 95).clamp(262.0, screenW / 2 - 160)
       : math.min(compact ? 200.0 : 262.0, screenW / 2 - 160);
-  var mockupSideCy = cy - 18;
-  final mockupSideCyMin = tableTop + 2 + mockupSideDy + 29;
+  if (shortMode) {
+    // El bolsillo exige sideX ≥ 263: con menos, la placa del
+    // 270 (180 px) no cabe entre el vaso lateral y el pozo sin
+    // tocar uno de los dos. El tope es el avatar lateral
+    // dentro de la pantalla (sideX ≤ screenW/2 − 90); en
+    // pantallas muy estrechas el bolsillo no cabe y el centro
+    // queda en el punto medio del intervalo (ver `pocketCx`).
+    mockupSideX =
+        math.max(mockupSideX, math.min(263.0, screenW / 2 - 90));
+  }
+  // Bolsillo del 270 en mesa corta: centro fijo cx − 128 en
+  // pantallas anchas. En pantallas angostas (< 700, p. ej.
+  // 640×360) ese centro NO cabe: la placa del bolsillo (180)
+  // chocaría con la placa lateral superior (derecha 180) y
+  // con mi avatar (izquierda cx − 32), y el vaso del bolsillo
+  // con la placa lateral superior. En angosto el bolsillo se
+  // recompone como FILA SUPERIOR (ver `mockupSeat`): placa de
+  // 120 a la izquierda del avatar, avatar 40 centrado en cx y
+  // vaso sujeto entre mi banda de dados (izquierda + 9) y la
+  // placa lateral derecha (derecha − 73). Esa rama IGNORA
+  // `pocketCx`: el valor se sigue calculando (y se usa en la
+  // rama ancha del bolsillo) para no cambiar la firma, pero en
+  // angosto el centro del asiento superior es cx, no pocketCx.
+  final bool pocketNarrow = shortMode && screenW < 700;
+  final double pocketCx = pocketNarrow
+      ? (cx - 128).clamp(
+          150.0 + 36.0,
+          math.min(cx - 32.0, cx - (myDiceCount * 22.0 + (myDiceCount - 1) * 4.0) / 2 - 8.0) -
+              28.0)
+      : cx - 128;
+  // En mesa corta la columna lateral baja 5 px (cy − 13 en vez
+  // de cy − 18) y su tope baja con el avatar corto (48, no 58):
+  // con cy − 18 y sideDy 51, la placa inferior quedaba 6 px bajo
+  // la mesa (tapada por la tira VER); con cy − 13 el avatar
+  // superior queda 2 px por encima de la mesa (margen vacío de
+  // la barra, visible porque el Stack pinta después) y la placa
+  // inferior termina 1 px antes del borde (mesa 180).
+  var mockupSideCy = shortMode ? cy - 13 : cy - 18;
+  final mockupSideCyMin =
+      shortMode ? tableTop + mockupSideDy + 26 : tableTop + 2 + mockupSideDy + 29;
   if (mockupSideCy < mockupSideCyMin) mockupSideCy = mockupSideCyMin;
 
   final seats = <SketchSeat>[];
@@ -602,6 +793,11 @@ SketchLayout sketchLayout({
         sideX: mockupSideX,
         tableTop: tableTop,
         myCupTop: myCup.top,
+        shortMode: shortMode,
+        pocketCx: pocketCx,
+        pocketNarrow: pocketNarrow,
+        screenW: screenW,
+        myDiceCount: myDiceCount,
       ));
       continue;
     }

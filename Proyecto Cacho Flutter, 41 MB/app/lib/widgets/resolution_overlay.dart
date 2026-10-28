@@ -8,6 +8,7 @@ import '../state/wallet.dart';
 import '../texts.dart';
 import '../theme.dart';
 import 'dice_and_cup.dart';
+import 'casino_anims.dart';
 
 /// Presupuesto de la revelación rediseñada (corrección 26-oct):
 /// dados Blender a 56 en rejilla de 2 columnas (hasta 3 filas),
@@ -271,7 +272,13 @@ class _ResolutionOverlayState extends State<ResolutionOverlay> {
     // visible; el texto del veredicto sigue sobre navyCard
     // opaca (contraste intacto) y título/contador/encabezado
     // llevan sombra negra en compacto.
-    return Container(
+    // Destello de veredicto (§3f): verde si el perdedor no soy
+    // yo, rojo si soy yo; solo el borde, nunca sobre el texto.
+    return VerdictFlash(
+      win: r.loserId != null && r.loserId != c.myId,
+      active: _step >= 2 && r.loserId != null,
+      enabled: CasinoAnims.enabledIn(context),
+      child: Container(
       color: Colors.black.withValues(
           alpha: widget.compact
               ? (_step >= 2
@@ -464,8 +471,20 @@ class _ResolutionOverlayState extends State<ResolutionOverlay> {
                   spacing: 8,
                   runSpacing: _rowGap,
                   children: [
-                    for (final entry in entries)
-                      _revealCell(entry.key, entry.value, ev, cellW),
+                    // Entrada elevada escalonada (§3d): la
+                    // revelación "levanta todos los vasos a la
+                    // vez mostrando los dados" en el lenguaje
+                    // del overlay — la rejilla ya muestra todas
+                    // las manos; cada celda sube con pequeño
+                    // bounce, 80 ms entre celdas, sin tocar
+                    // tamaños ni el conteo.
+                    for (final e in entries.asMap().entries)
+                      RevealCellAnim(
+                        index: e.key,
+                        enabled: CasinoAnims.enabledIn(context),
+                        child: _revealCell(
+                            e.value.key, e.value.value, ev, cellW),
+                      ),
                   ],
                 ),
               ],
@@ -530,6 +549,7 @@ class _ResolutionOverlayState extends State<ResolutionOverlay> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -721,6 +741,148 @@ class _ResolutionOverlayState extends State<ResolutionOverlay> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Destello verde/rojo con el resultado de Dudo/Calzo
+/// (layout-sin-solapes, §3f): un borde pulsante alrededor del
+/// overlay, dos pulsos en ~1,4 s, que se apaga solo. Verde si el
+/// perdedor no es el jugador local, rojo si lo es. Es SOLO un
+/// borde (`IgnorePointer`, sin fondo): nunca tapa el texto, los
+/// dados ni el botón, y no cambia el veredicto ni el layout.
+/// Con [active] false (sin veredicto aún o sin perdedor) o
+/// [enabled] false (animaciones apagadas) pinta el hijo directo.
+/// El controlador se libera en [dispose].
+class VerdictFlash extends StatefulWidget {
+  final Widget child;
+  final bool win;
+  final bool active;
+  final bool enabled;
+  const VerdictFlash({
+    super.key,
+    required this.child,
+    required this.win,
+    required this.active,
+    this.enabled = true,
+  });
+  @override
+  State<VerdictFlash> createState() => _VerdictFlashState();
+}
+
+class _VerdictFlashState extends State<VerdictFlash>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.active || !widget.enabled) return widget.child;
+    final color =
+        widget.win ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
+    return Stack(
+      children: [
+        widget.child,
+        Positioned.fill(
+          child: IgnorePointer(
+            child: AnimatedBuilder(
+              animation: _ctrl,
+              builder: (context, _) {
+                final t = _ctrl.value;
+                final opacity =
+                    (1 - t) * (0.65 + 0.35 * math.sin(t * math.pi * 4).abs());
+                return Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: color.withValues(alpha: opacity),
+                      width: 4,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Entrada elevada de una celda de revelación (§3d): sube 12 px
+/// con pequeño bounce (easeOutBack) y fundido en 500 ms, con
+/// 80 ms de escalonado por [index]. Con [enabled] false pinta el
+/// hijo directo. El controlador y el temporizador de arranque se
+/// liberan en [dispose]; la animación no cambia tamaños.
+class RevealCellAnim extends StatefulWidget {
+  final int index;
+  final Widget child;
+  final bool enabled;
+  const RevealCellAnim({
+    super.key,
+    required this.index,
+    required this.child,
+    this.enabled = true,
+  });
+  @override
+  State<RevealCellAnim> createState() => _RevealCellAnimState();
+}
+
+class _RevealCellAnimState extends State<RevealCellAnim>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  Timer? _startTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _startTimer = Timer(
+      Duration(milliseconds: widget.index * 80),
+      () {
+        if (mounted) _ctrl.forward();
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _startTimer?.cancel();
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.enabled) return widget.child;
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, child) {
+        final t = _ctrl.value;
+        final dy = 12 * (1 - Curves.easeOutBack.transform(t));
+        return Opacity(
+          opacity: t.clamp(0.0, 1.0),
+          child: Transform.translate(offset: Offset(0, dy), child: child),
+        );
+      },
+      child: widget.child,
     );
   }
 }

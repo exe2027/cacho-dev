@@ -18,6 +18,9 @@ import '../theme.dart';
 import '../widgets/dice_and_cup.dart';
 import '../widgets/dice_throw.dart';
 import '../widgets/sketch_layout.dart';
+import '../widgets/seat_block.dart';
+import '../widgets/cup_shake.dart';
+import '../widgets/bid_pop.dart';
 import '../widgets/panels.dart';
 import '../widgets/casino_anims.dart';
 import '../widgets/coin_widgets.dart';
@@ -57,6 +60,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   late final AnimationController _liftCtrl;
   late final CurvedAnimation _liftCurve;
   late final AnimationController _squashCtrl;
+  // Rebote final del vaso al terminar de subir con VER (28-oct):
+  // 300 ms, 8 px de subida extra y vuelta (ver `cupSettleDy`).
+  late final AnimationController _settleCtrl;
   // AN6: cortina de apertura (solo desde el lobby).
   bool _showEntryCurtain = false;
   bool _localMicOn = false;
@@ -74,6 +80,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   int _seenRound = -1;
   int? _armedFace;
   String? _lastActorId;
+  // Tirada visible de turno con dados blancos (28-oct): solo
+  // visual, nunca caras reales (ver dice_throw.dart). Se
+  // resuelve a coordenadas en `_sketchTable` (mesa horizontal);
+  // la rama vertical queda sin esta animación.
+  String? _turnThrowPlayerId;
+  int _turnThrowCount = 0;
+  int _turnThrowSeq = 0;
   String? _heldNotice;
   // Paridad docs/19 V1/B5: el vaso arranca CERRADO y mis dados
   // quedan ocultos bajo él. `_open` solo lo cambia VER
@@ -142,6 +155,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 180),
     );
+    _settleCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
     _entryCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -189,6 +206,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     _shakeCtrl.dispose();
     _liftCtrl.dispose();
     _squashCtrl.dispose();
+    _settleCtrl.dispose();
     _entryCtrl.dispose();
     AudioService.instance.stopMurmur();
     AudioService.instance.stopMusic();
@@ -200,17 +218,51 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   // ---------- Secuencia 3D del vaso ----------
 
-  void _setOpen(bool open, {bool fast = false}) {
+  void _setOpen(bool open, {bool fast = false, bool wobble = false}) {
     _open = open;
     if (_s.reducedEffects) {
       _liftCtrl.value = open ? 1 : 0;
+      _settleCtrl.value = 0;
       return;
     }
-    _liftCtrl.animateTo(
+    if (!open) _settleCtrl.value = 0;
+    // CORRECCIÓN 28-oct (usuario: "le quitaste la animación al
+    // vaso"): la animación del vaso NUNCA se borró — `_liftCtrl`
+    // (62 px de elevación + inclinación) seguía ahí —, pero
+    // quedó tapada por la animación de dados del 28-oct: VER
+    // abría rápido (200 ms) y los dados volaban 800 ms DESPUÉS
+    // de que el vaso ya estuviera quieto arriba, así que el ojo
+    // solo veía los dados y el vaso parecía teletransportado.
+    // Ahora la apertura dura lo mismo que el vuelo de los dados
+    // (800 ms, `diceThrowDuration`): el vaso sube VISIBLEMENTE
+    // mientras los dados salen de debajo de él, y con
+    // `wobble` (VER) además se agita en el aire con
+    // `_shakeCtrl` (sin sonido de tirada: revelar no es
+    // lanzar). El cierre sigue rápido (200 ms). Con
+    // animaciones apagadas no hay movimiento, como hoy. Solo
+    // mi vaso tiene esta animación: los vasos rivales nunca se
+    // abren (RivalCup estático, boca abajo), así que no había
+    // animación rival que restaurar.
+    _liftCtrl
+        .animateTo(
       open ? 1 : 0,
-      duration: Duration(milliseconds: fast ? 200 : 380),
+      duration: Duration(
+          milliseconds: open
+              ? diceThrowDuration.inMilliseconds
+              : (fast ? 200 : 380)),
       curve: Curves.easeOut,
-    );
+    )
+        .then((_) {
+      // Rebote final: solo al terminar de ABRIR y si sigue
+      // abierto (si el usuario cerró entremedio, el cierre ya
+      // puso el rebote en 0). No toca caras ni turnos.
+      if (mounted && open && _open && !_s.reducedEffects) {
+        _settleCtrl.forward(from: 0);
+      }
+    }, onError: (_) {});
+    if (open && wobble && !_shakeCtrl.isAnimating) {
+      _shakeCtrl.forward(from: 0);
+    }
   }
 
   /// Agita el vaso en el aire y lo deja caer a la mesa (golpe +
@@ -271,7 +323,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     if (_open || _liftCtrl.value > 0.5) {
       _setOpen(false, fast: true);
     } else {
-      _setOpen(true, fast: true);
+      _setOpen(true, wobble: true);
     }
   }
 
@@ -303,12 +355,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     if (_kamikazeBlind && !_wasBlind) {
       _open = false;
       _liftCtrl.value = 0;
+      _settleCtrl.value = 0;
     }
     _wasBlind = _kamikazeBlind;
     if (c.round != _seenRound) {
       _seenRound = c.round;
       _open = false;
       _liftCtrl.value = 0;
+      _settleCtrl.value = 0;
       // Mesa horizontal: la armada lateral se borra al cambiar de
       // ronda, igual que el BidDock vertical se recrea por evento.
       _consoleArmed = null;
@@ -363,6 +417,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     _wasMyTurn = c.isMyTurn;
     // Cambio de turno a otro jugador: tick suave (mi turno ya tiene
     // su campana; el primer actor de la partida no suena).
+    final prevActor = _lastActorId;
     if (c.actorId != _lastActorId) {
       final first = _lastActorId == null;
       _lastActorId = c.actorId;
@@ -371,6 +426,32 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           c.phase == 'playing' &&
           c.uiResolution == null) {
         AudioService.instance.tick();
+      }
+    }
+    // Tirada visible de turno con dados BLANCOS (28-oct, idea
+    // del usuario): al cambiar el jugador activo, todos ven
+    // salir dados blancos del vaso del jugador en turno, sin
+    // pintas jamás. Solo visual: no toca el controlador, la
+    // mano ni el turno (el disparo es la función pura
+    // `shouldStartTurnThrow`; aquí solo se guardan id/cantidad
+    // y `_sketchTable` resuelve el origen). Con animaciones
+    // apagadas no se dispara nada. Si el actor no tiene dados
+    // (eliminado) no se muestra nada.
+    if (shouldStartTurnThrow(
+      oldActor: prevActor,
+      newActor: c.actorId,
+      phase: c.phase,
+      hasResolution: c.uiResolution != null,
+      animationsEnabled:
+          CasinoAnims.enabledIn(context) && !_s.reducedEffects,
+    )) {
+      final count = c.playerById(c.actorId!)?.diceCount ?? 0;
+      if (count > 0 && mounted) {
+        setState(() {
+          _turnThrowPlayerId = c.actorId;
+          _turnThrowCount = count;
+          _turnThrowSeq++;
+        });
       }
     }
 
@@ -578,29 +659,25 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     ),
                   ),
                   KamikazeBar(controller: c),
-                  // Pastilla de turno: de quién es el turno, SIEMPRE
-                  // visible durante la partida (reporte 23-oct:
-                  // "cuesta saber cuándo es el turno de quién").
+                  // Pozo en vertical (la píldora "¡TU TURNO!" se
+                  // eliminó en el layout-sin-solapes: el turno lo
+                  // dan el aro dorado del asiento activo, la
+                  // barra de tiempo y el borde dorado de placa).
+                  // El pozo queda solo, centrado, sin fila nueva.
                   AnimatedSize(
                     duration: const Duration(milliseconds: 220),
                     curve: Curves.easeInOut,
                     child: (c.phase == 'playing' &&
                             c.uiResolution == null &&
-                            c.actorId != null)
+                            c.actorId != null &&
+                            c.stake > 0 &&
+                            c.displayPot > 0)
                         ? Padding(
                             padding: const EdgeInsets.only(top: 4),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                // B8 (sentencia v2.0): píldora de pozo
-                                // en la MISMA fila del turno, sin fila
-                                // nueva y sin solapar nada. El pozo
-                                // es el fijado al partir (displayPot).
-                                if (c.stake > 0 && c.displayPot > 0) ...[
-                                  _potChip(),
-                                  const SizedBox(width: 8),
-                                ],
-                                _turnPill(),
+                                _potChip(),
                               ],
                             ),
                           )
@@ -916,6 +993,11 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                             controller: c,
                             verOpen: _open,
                             onVerTap: () => setState(_toggleEye),
+                            // VER solo cuando sirve: fase de
+                            // juego y mano propia por revelar.
+                            showVer: c.myHand.isNotEmpty,
+                            onChatTap: () =>
+                                _showQuickChatSheet(context),
                           ),
                         ),
                       // ÁREA 9 — panel "Tu apuesta" JUSTO ENCIMA de
@@ -1047,46 +1129,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     ),
                   if (c.phase == 'finished' && c.uiResolution == null)
                     _winnerOverlay(),
-                  // Botón flotante de Chat / Emotes (mockup.jpeg)
-                  if (c.phase == 'playing' && c.uiResolution == null && !kamikaze)
-                    Positioned(
-                      left: 12,
-                      bottom: _landscapeConsoleOpen ? 66 : 12,
-                      child: Material(
-                        color: const Color(0xFF162544).withValues(alpha: 0.92),
-                        shape: const CircleBorder(),
-                        elevation: 6,
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: () => _showQuickChatSheet(context),
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: CachoColors.gold.withValues(alpha: 0.75),
-                                width: 1.5,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.5),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.chat_bubble_rounded,
-                                size: 20,
-                                color: CachoColors.ivory,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                  // Botón de chat/reacciones: ya NO es flotante
+                  // (layout-sin-solapes: tapaba la consola y la
+                  // barra inferior). La única entrada es el botón
+                  // 💬 de la tira VER (VerEmoteStrip), en fila.
                   // AN6: cortina de apertura al entrar desde el lobby.
                   if (_showEntryCurtain)
                     Positioned.fill(
@@ -1283,7 +1329,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     /// tight: solo la fila angosta (padding vertical 2 para que
     /// la píldora, 21 px, quepa en la fila 2 de 24 px; en ancho
     /// sigue el padding 4 de siempre). Sombra suave igual que
-    /// la _turnPill: profundidad del mockup sin cambiar tamaño.
+    /// la píldora de turno antigua: profundidad del mockup sin cambiar tamaño.
     Widget potPill({bool tight = false}) {
       return Container(
         // RONDA 3 (F3c): 10 → 8, aire para la apuesta.
@@ -1336,49 +1382,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       );
     }
 
-    /// Píldora de turno compacta para la fila angosta (la _turnPill
-    /// de 18 px de padding lateral no cabe junto a pozo + apuesta
-    /// a 390 px; mismo dato, mismo texto, padding lateral 10).
-    Widget turnPillCompact() {
-      final mine = c.isMyTurn;
-      final name = shortNameOf(c, c.actorId);
-      // Tooltip con el texto completo: a 390 px la píldora se
-      // recorta con elipsis y el actor se recupera aquí y por
-      // el aro del asiento (decisión 32).
-      return Tooltip(
-        message: mine ? '¡TU TURNO!' : 'Turno de $name',
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(
-            color: mine
-                ? CachoColors.gold
-                : const Color(0xFF1B2434).withValues(alpha: 0.94),
-            borderRadius: BorderRadius.circular(999),
-            border: mine
-                ? null
-                : Border.all(color: Colors.white.withValues(alpha: 0.22)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.45),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Text(
-            mine ? '¡TU TURNO!' : 'Turno de $name',
-            overflow: TextOverflow.ellipsis,
-            softWrap: false,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: mine ? const Color(0xFF221A08) : CachoColors.ivory,
-            ),
-          ),
-        ),
-      );
-    }
-
     /// Apuesta vigente compacta (la _currentBidChip de 34 px no
     /// cabe en la fila angosta de 28 px; mismo dato, mismo texto).
     Widget bidChipCompact() {
@@ -1387,8 +1390,11 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       // Texto sin "de " (−22 px a 14 px): cantidad + pinta +
       // apostador intactos como datos; el Tooltip devuelve la
       // frase completa ("X apostó N Pintas") si se recorta.
-      return Tooltip(
-        message: '$name apostó ${cur!.quantity} ${facePlural(cur.face)}',
+      return BidPop(
+        key: ValueKey('bid-narrow-$name-${cur!.quantity}x${cur.face}'),
+        enabled: CasinoAnims.enabledIn(context),
+        child: Tooltip(
+        message: '$name apostó ${cur.quantity} ${facePlural(cur.face)}',
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
@@ -1419,6 +1425,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               ),
             ],
           ),
+        ),
         ),
       );
     }
@@ -1616,62 +1623,30 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              // RONDA 3 (F3c): el turno va INTRÍNSECO
-                              // (sin Flexible) y la apuesta con
-                              // Flexible: con turno flex 1 frente a
-                              // apuesta flex 2 el turno se elipsaba
-                              // ("Turno d…", "¡TU TUR…"). Ahora el
-                              // turno nunca se recorta (toma lo que
-                              // necesita) y la apuesta cede: su
-                              // texto elipsa por la COLA (el nombre;
-                              // cantidad + pinta van primero y no
-                              // se truncan) con Tooltip completo.
-                              // Medido en captura ronda 3 (mesa6):
-                              // turno 149 + apuesta 195 (texto 151
-                              // para "8 Quintas · La Pituca") +
-                              // pozo 110 + gaps = 470 > ~443 libres,
-                              // y la apuesta elipsaba el nombre en
-                              // 27 px ("La Pi…"). Segundo ajuste:
-                              // recortes de 2 px en la barra ancha
-                              // (padding exterior 8→6, Salir/saldo/
-                              // pozo 10→8, turno compacto 12→10,
-                              // gaps 8→6, chip 8→6, gaps de iconos
-                              // 4→2: +34 px para el texto) para que
-                              // el peor caso con bots (9 caracteres)
-                              // quepa entero; con apodos de 16
-                              // caracteres la apuesta puede elipsar
-                              // el nombre (piso: cantidad + pinta
-                              // intactos + Tooltip).
-                              if (playing)
-                                _turnPill(shortName: true, compact: true)
-                              else
-                                Flexible(child: roomInfo()),
-                              if (cur != null) ...[
+                              // Layout-sin-solapes: la píldora
+                              // "¡TU TURNO!" se eliminó; el centro
+                              // de la barra es el POZO (píldora
+                              // compacta, monto real, siempre
+                              // visible cuando hay apuesta) y,
+                              // si la hay, la apuesta vigente con
+                              // Flexible (su texto elipsa por la
+                              // COLA: cantidad + pinta primero,
+                              // nombre después, con Tooltip
+                              // completo). Fuera de partida, en
+                              // vez de la apuesta va la etiqueta
+                              // de sala. El turno lo dan el aro
+                              // dorado del asiento activo, la
+                              // barra de tiempo y el borde dorado
+                              // de placa; ninguna otra indicación
+                              // de turno se eliminó.
+                              if (showPot) potPill(),
+                              if (showPot && cur != null)
                                 const SizedBox(width: 6),
-                                // RONDA 4 (apuesta en resolución):
-                                // fuera de turno la apuesta ya NO
-                                // comparte la fila a partes
-                                // iguales con la etiqueta de sala:
-                                // en revelación (p. ej.
-                                // revelacion_paso.png ronda 3) la
-                                // etiqueta "LOCAL · R3 · 28 dados"
-                                // con flex 1 frente a flex 1 dejaba
-                                // la píldora en "7 Quintas ·
-                                // El Hu…" cortada. Ahora la
-                                // apuesta lleva flex 3 frente a
-                                // flex 1 de la sala (centro ~347
-                                // px: sala ~87, apuesta ~260):
-                                // cantidad + pinta + autor salen
-                                // completos con nombres de 8
-                                // caracteres (píldora ~186 px) y
-                                // es la etiqueta de sala la que
-                                // cede y elipsa si falta sitio.
-                                // En mi turno no cambia nada
-                                // (turno intrínseco + apuesta
-                                // Flexible, piso ronda 3).
+                              if (cur != null)
                                 Flexible(
-                                    flex: 3, child: _currentBidChip()),
-                              ],
+                                    flex: 3, child: _currentBidChip())
+                              else if (!playing)
+                                Flexible(child: roomInfo()),
                             ],
                           ),
                         ),
@@ -1739,23 +1714,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      // Fila angosta, mismo criterio que la
+                      // ancha: POZO al centro, sin píldora de
+                      // turno; la apuesta (si la hay) cede con
+                      // Flexible, y fuera de partida va la
+                      // etiqueta de sala.
                       if (showPot) potPill(tight: true),
-                      if (showPot && (playing || cur != null))
+                      if (showPot && cur != null)
                         const SizedBox(width: 6),
-                      if (playing)
-                        // Prioridad fila 2 (ver comentario): la
-                        // apuesta lleva flex 2 y el turno flex 1;
-                        // en mi turno la píldora dorada va
-                        // intrínseca para no recortarse nunca.
-                        myTurn
-                            ? turnPillCompact()
-                            : Flexible(flex: 1, child: turnPillCompact())
+                      if (cur != null)
+                        Flexible(flex: 2, child: bidChipCompact())
                       else
                         Flexible(child: roomInfo()),
-                      if (cur != null) ...[
-                        const SizedBox(width: 6),
-                        Flexible(flex: myTurn ? 1 : 2, child: bidChipCompact()),
-                      ],
                     ],
                   ),
                 ),
@@ -1778,7 +1748,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   Widget _currentBidChip() {
     final cur = c.currentBid!;
     final name = c.lastBidderId == null ? '—' : shortNameOf(c, c.lastBidderId!);
-    return Tooltip(
+    // Pop al aparecer cada apuesta (§3e): claveado por el texto
+    // de la apuesta, una sola vez por apuesta nueva.
+    return BidPop(
+      key: ValueKey('bid-wide-$name-${cur.quantity}x${cur.face}'),
+      enabled: CasinoAnims.enabledIn(context),
+      child: Tooltip(
       message: '$name apostó ${cur.quantity} ${facePlural(cur.face)}',
       child: Container(
         // RONDA 3 (F3c): horizontal 6 (era 10, luego 8), aire texto.
@@ -1806,6 +1781,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -1848,134 +1824,51 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       consoleH: 72,
     );
 
+    // Bloques únicos por rival (ver seat_block.dart): un solo
+    // objeto por jugador desde un único ancla geométrica.
+    final blocks = <SeatBlock>[
+      for (var i = 0; i < others.length && i < layout.seats.length; i++)
+        _sketchRivalSeat(
+            others[i], layout.seats[i], others.length >= 7, screenW),
+    ];
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // Asientos rivales: avatar + placa + vaso, cada uno en su
-        // rect exacto del layout. Desde 7 rivales el layout usa
-        // arco igual (ver sketch_layout.dart); la guardia
+        // ORDEN DE PINTADO FIJO (layout-sin-solapes):
+        // mesa (fondo, fuera de este Stack) < vasos < escenario
+        // propio (dados) < avatares < mi asiento < placas (UI)
+        // < tirada de turno (overlay). Desde 7 rivales el layout
+        // usa arco igual (ver sketch_layout.dart); la guardia
         // i < layout.seats.length solo cubre un layout corto, no
         // oculta rivales: sketch_layout_test exige 0 solapes
         // hasta 11 rivales (P5).
-        for (var i = 0; i < others.length && i < layout.seats.length; i++)
-          ..._sketchRivalSeat(
-              others[i], layout.seats[i], others.length >= 7, screenW),
-        // Pozo arriba al centro (bosquejo): UNA fila —
-        // CORRECCIÓN 27-oct (capas): el pozo pinta DESPUÉS de los
-        // asientos rivales (mesa < cachos < dados < avatares <
-        // nameplates < pozo < UI), así su pastilla nunca queda
-        // tapada por un asiento; geométricamente tampoco se toca
-        // con ninguno (ver seat_layout.dart).
-        // etiqueta POZO + vaso pequeño 30×36 + monto REAL
-        // potFixed. Corrección 25-oct: el vaso ya NO es enorme
-        // al centro ni tapa "CACHO O DUDO". El vaso propio
-        // levantado queda en top ~112 (compacto) / ~116
-        // (completo), por debajo del pozo (58..94).
-        // Pulido ÁREA 7 (25-oct, sin cambiar el tipo): el rect
-        // del layout sigue siendo 140×36, pero el widget usa
-        // 180×40 centrado en el mismo cx: el contenido máximo
-        // real (apuesta 2.500 × 8 = "20.000") mide ~150-160 px
-        // y en 140 se arriesgaba a truncar/desbordar; en 180
-        // cabe sin truncar y sin tocar nada (medido SIN SOLAPE
-        // a 5 y a 8 jugadores, a 390 y a 350, contra asientos,
-        // placas, vasos y mi vaso). Alto 40 = la altura real
-        // de la pastilla (vaso 36 + padding 4): antes el rect
-        // de 36 la desbordaba 2 px por arriba y por abajo.
-        // RONDA 2 (F5): la pastilla ocupa y 2..34 relativa a la
-        // mesa (alto 32: vaso 28 + padding 4): su borde inferior
-        // (y 34 relativa = 90 en pantalla) TOCA sin cruzar el
-        // avatar superior (empieza en 90); antes (alto 40, hasta
-        // 98) el avatar la cruzaba 8 px. El vaso de la pastilla
-        // baja a 24×28 para que la pastilla no lo cruce: vaso
-        // DENTRO de la pastilla, nunca cruzándola. Monto a 14 px,
-        // softWrap false: nunca se parte en dos líneas ni se
-        // trunca. NO es la pila vertical del mockup: ese cambio
-        // queda para la decisión del final del día (ver reporte:
-        // a 8 choca con un vaso rival y en ambos casos tapa el
-        // watermark).
-        Positioned(
-          left: layout.pot.left - 20,
-          top: layout.pot.top - 56,
-          width: layout.pot.width + 40,
-          // CORRECCIÓN 27-oct: alto 32 (no 36) para que la
-          // pastilla no toque al avatar superior widget, que
-          // empieza 4 px por encima de su rect geométrico.
-          height: 32,
-          child: Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF162544), Color(0xFF0C1322)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: CachoColors.gold,
-                  width: 1.4,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.65),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                  BoxShadow(
-                    color: CachoColors.gold.withValues(alpha: 0.2),
-                    blurRadius: 10,
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'POZO',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: CachoColors.gold,
-                      shadows: [
-                        Shadow(color: Colors.black87, blurRadius: 5),
-                      ],
-                    ),
-                    softWrap: false,
-                  ),
-                  const SizedBox(width: 6),
-                  const CoinIcon(size: 16),
-                  const SizedBox(width: 5),
-                  Text(
-                    coinsText(c.displayPot),
-                    softWrap: false,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: CachoColors.ivory,
-                      shadows: [
-                        Shadow(color: Colors.black87, blurRadius: 5),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        // Mi escenario (vaso + dados con hueco 104).
+        for (final b in blocks) b.cup,
+        // POZO: ya no vive en la mesa (layout-sin-solapes:
+        // el vaso central lo tapaba). Vive en la barra superior
+        // (_sketchTopBar, potPill centrada) y aquí no se pinta
+        // nada en su lugar: la zona central queda libre para
+        // dados y logo. El rect `layout.pot` se conserva solo
+        // como referencia geométrica (aterrizaje de la tirada).
+        // Mi escenario (vaso + dados con hueco 104). El vaso es
+        // 72 de alto siempre (28-oct), así que la cuenta usa 72
+        // y no el 44 compacto viejo.
         Positioned(
           left: layout.myCup.cx - 165,
-          top: layout.myCup.top - 56 + (compact ? 44 : 72) - 140 + 7,
+          top: layout.myCup.top - 56 + 72 - 140 + 7,
           child: _myStageSketch(compact: compact),
         ),
+        // Capa avatares (con sus burbujas de reacción).
+        for (final b in blocks) b.avatar,
+        for (final b in blocks)
+          if (b.emoteBubble != null) b.emoteBubble!,
         // Mi asiento (RONDA 2, F4): placa CENTRADA BAJO mi avatar
         // (antes en fila a su derecha, descentrada). El widget
         // mide 120 de ancho (la placa) centrado en la pantalla:
         // avatar 390..454 sobre la placa 362..482, ambos
         // centrados en mi vaso (422) y en el hueco de dados.
         // La placa cuelga bajo la mesa sobre la tira VER (su
-        // zona central está vacía: VER a la izquierda, emotes
-        // a la derecha) y termina antes de la consola.
+        // zona central está vacía: VER a la izquierda, el botón
+        // de chat a la derecha) y termina antes de la consola.
         Positioned(
           left: screenW / 2 - 60,
           top: layout.myAvatar.top - 56,
@@ -1998,7 +1891,82 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             ],
           ),
         ),
+        // Capa placas (UI): nombres + puntos de dados.
+        for (final b in blocks) b.plate,
+        // Tirada visible de turno con dados blancos (28-oct):
+        // vuela desde el vaso del jugador en turno y se
+        // desvanece en la zona libre (ver _turnThrowOverlay).
+        // Se pinta ÚLTIMA en este Stack para que se vea, pero
+        // solo vive 1 s y su reposo no tapa nada; fuera de
+        // `playing` o con resolución abierta no se pinta.
+        if (_turnThrowPlayerId != null &&
+            c.phase == 'playing' &&
+            c.uiResolution == null)
+          _turnThrowOverlay(others, layout, screenW),
       ],
+    );
+  }
+
+  /// Overlay de la tirada de turno (dados blancos, sin pintas).
+  ///
+  /// Origen: centro del vaso del jugador en turno en
+  /// coordenadas de `_sketchTable` (los `Positioned` rivales
+  /// usan `geom.top − 56`, así que el origen es `cup.cy − 56`;
+  /// mi vaso visual tiene su centro en `myCup.cy − 56` por la
+  /// misma cuenta de `_myStageSketch`). Zona de aterrizaje:
+  /// paño libre entre el pozo (widget 2..34 relativo) y la
+  /// placa superior (widget desde 98 relativo a 390): centro
+  /// del hueco, con dados de 20 px quedan ≥22 px al pozo y
+  /// ≥22 px a la placa, y la fila centrada (≤116 px) no toca
+  /// las placas laterales. Sin asiento superior se usa el
+  /// centro alto de la mesa (40% de tableH). Si el jugador ya
+  /// no tiene asiento (eliminado entre el disparo y el
+  /// pintado) no se pinta nada. Solo mesa horizontal: la rama
+  /// vertical no tiene este overlay.
+  Widget _turnThrowOverlay(
+      List<PlayerView> others, SketchLayout layout, double screenW) {
+    final id = _turnThrowPlayerId!;
+    final Offset from;
+    if (id == c.myId) {
+      from = Offset(layout.myCup.cx, layout.myCup.cy - 56);
+    } else {
+      final idx = others.indexWhere((p) => p.id == id);
+      if (idx < 0 || idx >= layout.seats.length) {
+        return const SizedBox.shrink();
+      }
+      final cup = layout.seats[idx].cup;
+      from = Offset(cup.cx, cup.cy - 56);
+    }
+    // El pozo ya no vive en la mesa (barra superior): el tope
+    // superior de la zona libre es el borde de la mesa (rel 2).
+    const potBottomRel = 2.0;
+    var topPlateTopRel = layout.tableH * 0.4;
+    for (final s in layout.seats) {
+      if (s.angleDeg == 270) topPlateTopRel = s.plate.top + 4 - 56;
+    }
+    // Mesa corta: el aterrizaje central caería sobre mi vaso
+    // (ver `turnThrowLanding`); va al bolsillo superior derecho.
+    final land = turnThrowLanding(
+      tableH: layout.tableH,
+      screenW: screenW,
+      potBottomRel: potBottomRel,
+      topPlateTopRel: topPlateTopRel,
+    );
+    final seq = _turnThrowSeq;
+    return Positioned.fill(
+      child: TurnThrowOverlay(
+        key: ValueKey('turn-throw-$seq'),
+        from: from,
+        landCenter: land,
+        count: _turnThrowCount,
+        onDone: () {
+          if (mounted && _turnThrowSeq == seq) {
+            setState(() {
+              _turnThrowPlayerId = null;
+            });
+          }
+        },
+      ),
     );
   }
 
@@ -2007,7 +1975,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   /// su rect del layout. ÁREA 2 (mockup): la placa va SIEMPRE
   /// debajo del avatar; los inferiores (60/120) llevan placa
   /// de una línea; en arco igual (7+) la placa es de 84.
-  List<Widget> _sketchRivalSeat(PlayerView p, SketchSeat geom,
+  /// Bloque único del rival (ver seat_block.dart): sus tres
+  /// capas se pintan en orden global en `_sketchTable`
+  /// (vasos < dados < avatares < placas), no por jugador.
+  SeatBlock _sketchRivalSeat(PlayerView p, SketchSeat geom,
       [bool small = false, double screenW = 844]) {
     final angle = geom.angleDeg;
     const plateSide = SketchPlateSide.below;
@@ -2023,16 +1994,24 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     // rect 48 con vaso NORMAL (small=false): widget 56 (radio 23)
     // recentrado 4 px (no 3), para que el círculo quede centrado.
     final avatarIs48 = geom.avatar.width == 48;
-    final avatarWidget = small || avatarIs48 ? 56 : 64;
-    final avatarOff = small ? 3 : (avatarIs48 ? 4 : 3);
+    // Asiento superior angosto: avatar geom 40 → widget 48
+    // (mismo offset 4 que el de 48), para que quepa entre la
+    // barra y mi vaso sin solapar ninguno.
+    final avatarWidget = geom.avatar.width == 40
+        ? 48
+        : (small || avatarIs48 ? 56 : 64);
+    final avatarOff =
+        geom.avatar.width == 40 ? 4 : (small ? 3 : (avatarIs48 ? 4 : 3));
     final avatar = Positioned(
       left: geom.avatar.left - avatarOff,
       top: geom.avatar.top - 56 - avatarOff,
       width: avatarWidget.toDouble(),
       height: avatarWidget.toDouble(),
-      child: _seatShadow(PlayerSeat(
+      child: RepaintBoundary(
+        child: _seatShadow(PlayerSeat(
         nickname: shortNick,
-        avatarRadius: avatarWidget == 56 ? 23 : 27,
+        avatarRadius:
+            avatarWidget == 48 ? 19 : (avatarWidget == 56 ? 23 : 27),
         seed: p.id,
         diceCount: p.diceCount,
         isTurn: c.actorId == p.id,
@@ -2047,7 +2026,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         ringFraction: _ringFractionFor(p.id),
         micOn: (c.online && !p.isBot) ? p.micOn : null,
         dcDeadlineMs: p.dcDeadlineMs,
-      )),
+        )),
+      ),
     );
     // RONDA 2 (F4): la placa SOLAPA el borde inferior del avatar
     // 6 px (antes quedaba 2 px separada): −8 en top. Roce de
@@ -2072,8 +2052,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     // + pipas compactas de 7 px = 47 px + gap 6 + padding 12 =
     // 161 ≤ 180); las demás placas de una línea (ángulos 60/120
     // forzados) siguen en 132, sin regresión respecto a antes.
-    final plateW =
-        geom.singleLinePlate ? 180.0 : max(geom.plate.width, 132.0);
+    // Placa widget (mismo mapa que seat_layout.dart): 180 de
+    // una línea, 132 de dos líneas, 150 de una línea en
+    // laterales angostos y 120 de dos líneas en el bolsillo
+    // angosto (a la izquierda del avatar).
+    final plateW = geom.narrowPlate
+        ? (geom.angleDeg == 270 ? 120.0 : 150.0)
+        : (geom.singleLinePlate ? 180.0 : max(geom.plate.width, 132.0));
     // CORRECCIÓN 27-oct: la placa se CENTRA en el centro
     // geométrico (antes empezaba en geom.plate.left, con lo que
     // una placa de 132 px sobresalía 44 px hacia el centro y
@@ -2088,7 +2073,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       left: plateLeft,
       top: geom.plate.top - 56 + 4,
       width: plateW,
-      child: PlayerSeat(
+      // Rendimiento (layout-sin-solapes): cada capa del bloque
+      // repinta solo cuando cambia.
+      child: RepaintBoundary(
+        child: PlayerSeat(
         nickname: shortNick,
         seed: p.id,
         diceCount: p.diceCount,
@@ -2108,6 +2096,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         ringFraction: _ringFractionFor(p.id),
         micOn: null,
         dcDeadlineMs: p.dcDeadlineMs,
+        ),
       ),
     );
     // Huella con posavasos 1,3× (73×72; 52×54 en arco igual):
@@ -2120,11 +2109,20 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       top: geom.cup.top - 56 - 4,
       width: small ? 52 : 73,
       height: small ? 54 : 72,
-      child: RivalCup(
+      // Agite de inicio de ronda (§3a): claveado por ronda, una
+      // sola vez por ronda; el vaso propio ya se agita por
+      // _playRollClosed, este cubre los rivales.
+      child: CupShake(
+        key: ValueKey('cupshake-${c.round}-${p.id}'),
+        enabled: CasinoAnims.enabledIn(context) && !_s.reducedEffects,
+        child: RepaintBoundary(
+        child: RivalCup(
         leather: CachoColors.leatherLight,
         cupW: small ? 40 : 56,
         cupH: small ? 46 : 64,
         skinId: p.cupSkinId,
+        ),
+        ),
       ),
     );
     // Reacción del rival (relay en línea pendiente: hoy solo puede
@@ -2145,12 +2143,20 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             ),
           )
         : null;
-    // CORRECCIÓN 27-oct (capas): dentro del asiento el vaso
-    // pinta PRIMERO y la placa ÚLTIMA (vaso < avatar < placa),
+    // CORRECCIÓN 27-oct (capas), ahora con pintado GLOBAL:
+    // `_sketchTable` pinta todos los vasos, luego los dados,
+    // luego todos los avatares y luego todas las placas; dentro
+    // del jugador el orden es el mismo (vaso < avatar < placa),
     // así ninguna nameplate queda tapada por un vaso aunque
     // dos rectángulos se tocaran; la geometría (seat_layout)
     // además garantiza que no se tocan.
-    return [cup, avatar, plate, if (emoteBubble != null) emoteBubble];
+    return SeatBlock(
+      geom: geom,
+      cup: cup,
+      avatar: avatar,
+      plate: plate,
+      emoteBubble: emoteBubble,
+    );
   }
 
   Widget _mySeatSketch() {
@@ -2206,8 +2212,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         width: 330,
         height: 140,
         child: AnimatedBuilder(
-          animation: Listenable.merge(
-              [_shakeCtrl, _liftCtrl, _squashCtrl, _entryCtrl]),
+          animation: Listenable.merge([
+            _shakeCtrl,
+            _liftCtrl,
+            _squashCtrl,
+            _settleCtrl,
+            _entryCtrl
+          ]),
           builder: (context, _) {
             final sv = _shakeCtrl.value;
             final lift = _kamikazeBlind ? 0.0 : _liftCurve.value;
@@ -2229,14 +2240,23 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             // dejando el posavasos estático sobre la mesa y revelando
             // los dados debajo.
             final liftDy = 62.0 * lift;
-            final dy = hopY - liftDy;
+            // Rebote final 28-oct (ver `cupSettleDy`): al terminar
+            // de subir, el vaso sube 8 px más y vuelve a su sitio
+            // en 300 ms — la animación se percibe aunque se mire
+            // un instante tarde, sin alargar el turno ni tocar
+            // las caras (el vaso queda levantado mientras VER
+            // esté abierto, como hoy; al cerrar, el rebote se
+            // cancela). Con animaciones apagadas, 0.
+            final settleDy = cupSettleDy(_settleCtrl.value, lift);
+            final dy = hopY - liftDy - settleDy;
             final entryDrop = (1 - _entryCtrl.value) * 80;
             final squash = 1 - 0.07 * sin(_squashCtrl.value * pi);
-            final cupW = compact ? 44.0 : 64.0;
-            // CORRECCIÓN 27-oct: vaso propio 72/44, igual que
-            // en sketch_layout (antes 76/52, que en compacto
-            // tocaba la placa superior widget).
-            final cupH = compact ? 44.0 : 72.0;
+            // CORRECCIÓN 28-oct (orden del usuario): mi vaso es
+            // 64×72 SIEMPRE, igual que en sketch_layout, nunca
+            // menor que el vaso rival (56×64). El compacto 44
+            // viejo es justo lo que se veía en iPhone apaisado.
+            final cupW = 64.0;
+            final cupH = 72.0;
             final cupLeft = (330 - cupW) / 2;
             final coasterW = CachoCup.coasterWidthFor(cupW);
             final coasterH = coasterW / 3.0;
@@ -2299,16 +2319,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     children: [
                       for (var i = 0; i < nDice; i++) ...[
                         if (i > 0) const SizedBox(width: 4),
-                        ThrownDie(
-                          index: i,
-                          count: nDice,
-                          dieSize: dieSize,
-                          gap: 4,
-                          active: lift > 0.5,
-                          enabled: CasinoAnims.enabledIn(context) &&
-                              !_s.reducedEffects,
-                          child: _cubeDie(i, lift,
-                              size: dieSize, blender: false),
+                        RepaintBoundary(
+                          child: ThrownDie(
+                            index: i,
+                            count: nDice,
+                            dieSize: dieSize,
+                            gap: 4,
+                            active: lift > 0.5,
+                            enabled: CasinoAnims.enabledIn(context) &&
+                                !_s.reducedEffects,
+                            child: _cubeDie(i, lift,
+                                size: dieSize, blender: false),
+                          ),
                         ),
                       ],
                     ],
@@ -2604,60 +2626,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   /// El Guatón" + pozo). En horizontal además va compacta (C5,
   /// decidido por el usuario: 26–28 px en vez de ~38). El vertical
   /// no cambia (shortName y compact false por defecto).
-  Widget _turnPill({bool shortName = false, bool compact = false}) {
-    final mine = c.isMyTurn;
-    var name = '';
-    if (shortName) {
-      name = shortNameOf(c, c.actorId);
-    } else {
-      for (final p in c.players) {
-        if (p.id == c.actorId) name = p.nickname;
-      }
-    }
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 200),
-      child: Container(
-        key: ValueKey('turn-${c.actorId}'),
-        // B9 (sentencia v2.0): pastilla de turno más grande, dentro
-        // de su franja, sin desplazar la mesa ni tapar el aro.
-        // C5: en horizontal va compacta (26–28 px de alto; medida
-        // real con padding 5: 30 px, por eso baja a 4).
-        // RONDA 3 (F3c): horizontal 10 en compacto (era 18, luego
-        // 12) para que la apuesta quepa entera; el turno sigue
-        // intrínseco y nunca se recorta.
-        padding: EdgeInsets.symmetric(
-            horizontal: compact ? 10 : 18, vertical: compact ? 4 : 8),
-        decoration: BoxDecoration(
-          color: mine
-              ? CachoColors.gold
-              : const Color(0xFF1B2434).withValues(alpha: 0.94),
-          borderRadius: BorderRadius.circular(999),
-          border: mine
-              ? null
-              : Border.all(color: Colors.white.withValues(alpha: 0.22)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.45),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Text(
-          mine ? '¡TU TURNO!' : 'Turno de $name',
-          overflow: TextOverflow.ellipsis,
-          softWrap: false,
-          style: TextStyle(
-            fontSize: compact ? 14 : 15,
-            fontWeight: FontWeight.w800,
-            color: mine ? const Color(0xFF221A08) : CachoColors.ivory,
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Mi asiento (abajo a la izquierda): aro dorado, estado y pipas.
   Widget _mySeat({bool compact = false}) {
     final me = c.me;
     final myLast = c.lastActionBy[c.myId];

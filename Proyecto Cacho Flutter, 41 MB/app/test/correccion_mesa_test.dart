@@ -29,8 +29,17 @@ void main() {
                 '${ov.map((e) => '${e.$1.label}~${e.$2.label}=${e.$3}').join(', ')}');
         // Puestos del mockup: 1 arriba al centro, 2 a la izquierda,
         // 2 a la derecha (orden de ocupación: pares y centro último).
+        // En mesa corta 28-oct (H=350, mesa 230) el 270 ya NO va
+        // en el centro —ahí se apilaba con mi vaso de 72— sino
+        // en el bolsillo a la izquierda del pozo (cx 294 a 844);
+        // en mesa normal (H=390) sigue en el centro.
         final byAngle = {for (final s in l.seats) s.angleDeg: s};
-        expect(byAngle[270]!.avatar.cx, 422);
+        if (h >= 390) {
+          expect(byAngle[270]!.avatar.cx, 422);
+        } else {
+          expect(byAngle[270]!.avatar.cx, lessThan(422));
+          expect(byAngle[270]!.avatar.cx, 294);
+        }
         expect(byAngle[225]!.avatar.cx, lessThan(422));
         expect(byAngle[315]!.avatar.cx, greaterThan(422));
         expect(byAngle[135]!.avatar.cx, lessThan(422));

@@ -52,21 +52,41 @@ class AudioService {
   /// Desbloqueo de audio (iOS/web): el navegador mantiene el
   /// contexto suspendido hasta un gesto del usuario; sin esto los
   /// sonidos existen pero no se oyen. Se llama en el primer toque.
+  ///
+  /// OJO (28-oct, carrusel mudo en iPhone): el desbloqueo viejo
+  /// solo calentaba el reproductor principal (`_player`). Los
+  /// ticks del carrusel usan OTROS reproductores (el pool de
+  /// abajo), que se crean perezosamente en el primer tack, es
+  /// decir, en callbacks de animación/scroll FUERA del gesto.
+  /// En web cada reproductor crea su propio AudioContext, que
+  /// nace suspendido, y Safari solo lo reanuda dentro de un
+  /// gesto; fuera del gesto el `resume()` se ignora sin error
+  /// y el tick suena en silencio para siempre, mientras los
+  /// sonidos del reproductor principal (dados, música) sí se
+  /// oyen. Por eso el carrusel era mudo aunque todo estuviera
+  /// encendido. La corrección: precalentar el pool completo
+  /// DENTRO del gesto, en cada llamada a unlock(), no solo la
+  /// primera (si el primer gesto falló, el siguiente arrastre
+  /// vuelve a intentarlo; el silencio es a volumen 0 y no se
+  /// oye). Los reproductores ya calentados reutilizan su
+  /// AudioContext reanudado cuando luego suena el tick.
   Future<void> unlock() async {
-    if (_unlocked) return;
-    _unlocked = true;
-    try {
-      final player = _player ??= AudioPlayer();
-      await player.resume();
-      await _musicPlayer?.resume();
-      await _murmurPlayer?.resume();
-      if (Settings.instance.soundEffects) {
-        await player.setVolume(0.0);
-        await player.play(AssetSource('sounds/silent.wav'));
+    if (!_unlocked) {
+      _unlocked = true;
+      try {
+        final player = _player ??= AudioPlayer();
+        await player.resume();
+        await _musicPlayer?.resume();
+        await _murmurPlayer?.resume();
+        if (Settings.instance.soundEffects) {
+          await player.setVolume(0.0);
+          await player.play(AssetSource('sounds/silent.wav'));
+        }
+      } catch (_) {
+        // Si el gesto no alcanzó, el próximo play lo reintenta solo.
       }
-    } catch (_) {
-      // Si el gesto no alcanzó, el próximo play lo reintenta solo.
     }
+    await _warmTickPool();
     syncAmbience();
   }
 
@@ -102,6 +122,37 @@ class AudioService {
   /// stop() antes de sonar.
   final List<AudioPlayer> _tickPlayers = [];
   int _tickPlayerIndex = 0;
+
+  /// Tamaño actual del pool de ticks. Gancho de diagnóstico/tests
+  /// (en producción nadie lo lee): permite comprobar que unlock()
+  /// precalentó el pool antes del primer tack.
+  int get tickPoolSize => _tickPlayers.length;
+
+  /// Precalienta el pool de ticks dentro de un gesto del usuario
+  /// (ver unlock()): crea los 4 reproductores y reproduce un
+  /// silencio a volumen 0 en cada uno, para que cada AudioContext
+  /// web nazca y se reanude con activación del usuario. Con los
+  /// efectos apagados no se calienta nada: si el usuario apaga
+  /// "Sonidos" a propósito, sigue apagado, y el próximo gesto
+  /// tras volver a encenderlo calienta el pool de nuevo.
+  Future<void> _warmTickPool() async {
+    if (!Settings.instance.soundEffects) return;
+    try {
+      while (_tickPlayers.length < 4) {
+        _tickPlayers.add(AudioPlayer());
+      }
+      for (final player in _tickPlayers) {
+        try {
+          await player.setVolume(0.0);
+          await player.play(AssetSource('sounds/silent.wav'));
+        } catch (_) {
+          // Un reproductor sin audio no bloquea a los demás.
+        }
+      }
+    } catch (_) {
+      // Sin audio (tests, web sin gesto): el próximo gesto reintenta.
+    }
+  }
 
   Future<void> _playTick(String file, {double volume = 0.45}) async {
     if (!Settings.instance.soundEffects) return;

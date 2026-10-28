@@ -908,11 +908,15 @@ class PlayerSeat extends StatelessWidget {
       )..layout();
       final showBalance =
           balanceText != null && tp.width + 65 <= plateWidth;
-      const nameStyle = TextStyle(
-        fontSize: 14,
+      // Placa angosta (bolsillo 270 a < 700, 120 px): el nombre
+      // a 14 px ("El Huaso" = 112 px) no cabe en 108 px de
+      // contenido; a 12 px mide 96 px y cabe. Solo afecta a
+      // esa placa: el resto sigue a 14 px.
+      final nameStyle = TextStyle(
+        fontSize: plateWidth <= 120 ? 12 : 14,
         fontWeight: FontWeight.w700,
         height: 1.1,
-        shadows: [
+        shadows: const [
           Shadow(color: Colors.black87, blurRadius: 5),
         ],
       );
@@ -1050,7 +1054,14 @@ class PlayerSeat extends StatelessWidget {
           ],
         );
       }
-      // Placa cápsula oscura estilizada según mockup.jpeg:
+      // Placa cápsula oscura estilizada según mockup.jpeg.
+      // Señal de turno PERSISTENTE 28-oct (en horizontal la
+      // pastilla EN TURNO está suprimida y solo quedaban el aro
+      // y la barra: por eso el turno no se percibía): en turno,
+      // el borde de la placa toma el color del aro (dorado en
+      // mi caso) y brilla, hasta que el turno cambia. El borde
+      // pinta DENTRO de la placa: no cambia su rectángulo ni
+      // crea solapes nuevos.
       plateCol = Container(
         padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 6),
         decoration: BoxDecoration(
@@ -1061,13 +1072,20 @@ class PlayerSeat extends StatelessWidget {
           ),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-              color: Colors.white.withValues(alpha: 0.18), width: 1.2),
+              color: sketchPlateBorderColor(
+                  isTurn: isTurn, ringColor: ringColor),
+              width: sketchPlateBorderWidth(isTurn)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.6),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
+            if (isTurn && !eliminated)
+              BoxShadow(
+                color: ringColor.withValues(alpha: 0.45),
+                blurRadius: 10,
+              ),
           ],
         ),
         child: plateCol,
@@ -1249,6 +1267,20 @@ bool isBeepSecond(int secondsLeft) => secondsLeft >= 1 && secondsLeft <= 3;
 /// se lea de un vistazo y no se confunda con el color de identidad);
 /// fuera de turno, el color de identidad del jugador. Corrección del
 /// usuario, 24-oct: el arco fino solo se perdía pegado al borde dorado.
+/// Borde de la placa bosquejo: en turno, el color del aro (28-oct,
+/// señal de turno persistente en horizontal, donde la pastilla
+/// EN TURNO está suprimida); fuera de turno, el blanco tenue de
+/// siempre. Puro (testeable) y sin geometría: el borde pinta
+/// dentro de la placa.
+Color sketchPlateBorderColor({
+  required bool isTurn,
+  required Color ringColor,
+}) =>
+    isTurn ? ringColor : Colors.white.withValues(alpha: 0.18);
+
+/// Ancho del borde de la placa bosquejo: 2,0 en turno, 1,2 fuera.
+double sketchPlateBorderWidth(bool isTurn) => isTurn ? 2.0 : 1.2;
+
 Color seatRingColor({
   required Color identity,
   required bool isTurn,
