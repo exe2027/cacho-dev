@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../state/audio.dart';
 import '../state/wallet.dart';
+import '../widgets/carousel_fling.dart';
 import '../widgets/casino_anims.dart';
 import '../table_themes.dart';
 import '../theme.dart';
@@ -132,8 +134,33 @@ class _BuscarSalasScreenState extends State<BuscarSalasScreen> {
   late final PageController _pageController =
       PageController(viewportFraction: 0.88);
   int _activeIndex = 0;
+  // Última página entera cruzada durante un deslizamiento: cada
+  // vez que la página redondeada cambia, suena un tack, así que
+  // un fling multi-tarjeta se oye tack tack tack al pasar por
+  // cada tarjeta, no una sola ráfaga al final.
+  int _lastCrossedPage = 0;
   final _code = TextEditingController();
   final _codeFocus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController.addListener(() {
+      final page = _pageController.page;
+      if (page == null) return;
+      final crossed = page.round();
+      if (crossed == _lastCrossedPage) return;
+      final jump = (crossed - _lastCrossedPage).abs();
+      _lastCrossedPage = crossed;
+      if (jump > 1) {
+        // Salto instantáneo (animaciones OFF): no hay pasos
+        // intermedios que ver, así que suena la ráfaga completa.
+        AudioService.instance.roulette();
+      } else {
+        AudioService.instance.tack();
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -149,9 +176,14 @@ class _BuscarSalasScreenState extends State<BuscarSalasScreen> {
   /// activadas).
   void _goToPage(int index) {
     if (CasinoAnims.enabledIn(context)) {
+      // Un paso por tarjeta (~120 ms cada una, mínimo 200 ms):
+      // ir a una tarjeta lejana gira pasando por las intermedias
+      // y cada una suena su tack, no un salto instantáneo.
+      final steps = (index - _activeIndex).abs();
+      final ms = (carouselStepDurationMs * steps).clamp(200, 720);
       _pageController.animateToPage(
         index,
-        duration: const Duration(milliseconds: 350),
+        duration: Duration(milliseconds: ms),
         curve: Curves.easeOutCubic,
       );
     } else {
@@ -263,16 +295,26 @@ class _BuscarSalasScreenState extends State<BuscarSalasScreen> {
                   ),
                 ),
                 // Carrusel horizontal: reemplaza la lista vertical
-                // (no convive con ella). Snap nativo de PageView:
-                // el desplazamiento anima con easing y al soltar
-                // cae en la tarjeta; con animaciones OFF el
-                // PageView sigue funcionando sin animación.
+                // (no convive con ella). Física multi-página: un
+                // fling rápido atraviesa varias tarjetas (pasos por
+                // velocidad, ver carousel_fling.dart) y el listener
+                // suena un tack por tarjeta cruzada; con animaciones
+                // OFF el PageView sigue funcionando sin animación.
                 Expanded(
                   child: PageView.builder(
                     controller: _pageController,
+                    physics: MultiPageScrollPhysics(
+                      itemCount: Wallet.stakes.length,
+                      activePage: _activeIndex,
+                    ),
                     itemCount: Wallet.stakes.length,
-                    onPageChanged: (i) =>
-                        setState(() => _activeIndex = i),
+                    onPageChanged: (i) {
+                      // El sonido ya sonó por tarjeta cruzada en
+                      // el listener; aquí solo se actualiza el
+                      // índice activo y la última cruzada.
+                      _lastCrossedPage = i;
+                      setState(() => _activeIndex = i);
+                    },
                     itemBuilder: (context, i) {
                       return StaggerIn(
                         index: i,

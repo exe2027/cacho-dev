@@ -16,7 +16,10 @@ import 'dart:math' as math;
 ///   SIEMPRE DEBAJO, vaso 56×64 hacia fuera; asiento superior con
 ///   avatar 48 + placa de una línea 88×18 (el hueco pozo~mi-vaso
 ///   no da para más) y vaso a su derecha junto al avatar
-///   (RONDA 3: centro cx + 57, hueco 5 px; antes cx + 92); en
+///   (CORRECCIÓN 27-oct, sin solapes widget: centro cx + 76,
+///   hueco 24 geom / 12 widget a la placa de 132; la RONDA 3
+///   (centro cx + 57, hueco 5 px) tapaba la placa en widget
+///   porque la placa real mide 132, no 88); en
 ///   mesa corta su placa se corre a la izquierda. Medido 0
 ///   solapes a 844×390 y a 350
 ///   (mesa 230) con dados 5/3/1; residuos solo a mesa real 206/178
@@ -71,7 +74,8 @@ import 'dart:math' as math;
 ///   y cifra legible, sin tapar el centro).
 /// - Mi vaso 64×76 (no 101×118: el vaso enorme al centro era lo
 ///   que el usuario leyó como "vaso del pozo" tapando el centro).
-///   Mis dados 48 (28 en compacto, con pintas Blender agrandadas
+///   Mis dados 34 (20 en compacto: ~30% menos que los 48/28
+///   anteriores, orden 27-oct, con pintas Blender agrandadas
 ///   25-oct: a 36 las pintas eran invisibles a 390) en BANDA
 ///   INFERIOR, centrados en el vaso con hueco 104: el centro
 ///   queda limpio para que "CACHO O DUDO" se lea completo; los
@@ -274,30 +278,36 @@ SketchSeat mockupSeat({
     // vaso; el cx − 200 viejo chocaba con esa placa lateral
     // cuando sideX bajó a 200, 440 px² a mesa 206), siempre
     // debajo del avatar.
-    // RONDA 3 (F3e): el vaso va JUNTO a su avatar (hueco 5 px:
-    // left = cx + 29, centro a 57 del centro del avatar), no a
-    // cx + 64 (centro a 92: +10,9 puntos sobre el avatar, y
-    // +9,1 sobre la referencia 49–55 %). Centrarlo exacto sobre
-    // el avatar es imposible sin romper la columna (el vaso
-    // bajo la placa solaparía mi vaso en 1456 px² a mesa 290 y
-    // en 2288 px² a mesa 232 compacta, medido): piso = junto al
-    // avatar con hueco estándar. Para que el vaso junto no tape
-    // el texto de la placa (el widget la ensancha a 132 hacia la
-    // derecha), la placa geométrica se corre 38 a la izquierda
-    // (left = cx − 82): el widget queda en 340..472 (centro 406,
-    // −16 del avatar, dentro del margen ±2–3 puntos), su texto
-    // termina en ~451 y el vaso visual empieza en ~457 (aire
-    // ~6 px). Sin este corrimiento el vaso taparía la cola del
-    // texto ("El Huaso").
-    final avatarTop = tableTop + 38;
+    // CORRECCIÓN 27-oct (supera RONDA 3 F3e): el vaso va a la
+    // derecha de su avatar con centro a 76 del centro del
+    // avatar (geom left = cx + 48), no a cx + 29 (centro 57):
+    // con la placa widget real de 132 px centrada en el centro
+    // geométrico (cx − 38), el vaso a 57 quedaba a 21 px de la
+    // placa widget y su huella 73 px tapaba la placa y, en
+    // widget, al vaso superior-derecho. Ahora el vaso widget
+    // empieza 12 px a la derecha de la placa widget y 12 px a
+    // la derecha del avatar widget. La placa geométrica sigue
+    // corrida 38 a la izquierda (left = cx − 82) para que su
+    // texto no quede bajo el vaso.
+    // CORRECCIÓN 28-oct (placa superior truncada): la placa de
+    // una línea pasó de 132 a 180 px de ancho (ver game_screen
+    // y dice_and_cup: nombre a 12 px + pipas compactas de 7 px)
+    // para que "El Huaso" (112 px a 14 px, 96 px a 12 px) quepa
+    // completo. La placa geométrica se corre 4 px a la derecha
+    // (left = cx − 78, centro cx − 34) y el vaso otros 20 px
+    // (geom left = cx + 68): así la placa widget (centro
+    // geométrico ± 90) queda con 12 px libres al vaso en widget
+    // (cuerpo desde cx + 68) y ≥8 px a las placas laterales en
+    // los 4 viewports de seat_layout_test.
+    final avatarTop = tableTop + 42;
     final plateTop = avatarTop + 50;
     final centered = plateTop + 18 + 2 <= myCupTop;
     return SketchSeat(
       angle,
       SketchRect('avatar-270', cx - 24, avatarTop, 48, 48),
       SketchRect('placa-270',
-          centered ? cx - 82 : cx - sideX + 48, plateTop, 88, 18),
-      SketchRect('vaso-270', cx + 29, avatarTop + 6, 56, 64),
+          centered ? cx - 78 : cx - sideX + 48, plateTop, 88, 18),
+      SketchRect('vaso-270', cx + 68, avatarTop + 10, 56, 64),
       singleLinePlate: true,
     );
   }
@@ -305,21 +315,21 @@ SketchSeat mockupSeat({
   final upper = angle == 225 || angle == 315;
   final scx = left ? cx - sideX : cx + sideX;
   final scy = upper ? sideCy - sideDy : sideCy + sideDy;
-  // RONDA 2 (26-oct, F3): vasos SOBRE el anillo junto a su avatar.
-  // Superiores: hacia DENTRO (al centro): hacia fuera caían fuera
-  // del óvalo (el óvalo se estrecha arriba: a la altura del vaso
-  // superior el borde queda en x ~118 y el vaso exterior
-  // 58..128 flotaba sobre la sala). Hacia dentro el vaso queda
-  // sobre el paño junto al avatar (hueco 5 px) y con 3 px de aire
-  // a la placa (su y se baja 2 para eso). Inferiores: hacia fuera
-  // como siempre, pero a 62 (no 67): hueco 5 px al avatar.
-  // En pantallas anchas (> 844, web/desktop), todos los vasos van orientados hacia
-  // el interior de la mesa desde su lado (arreglo.md §4: izquierda +62, derecha -62).
-  // En pantallas angostas (<= 844), los inferiores van hacia afuera para no tocar
-  // los 5 dados centrales del jugador en 844x350.
-  final cupCx = (cx * 2 > 844)
-      ? (left ? scx + 62 : scx - 62)
-      : (upper ? (left ? scx + 62 : scx - 62) : (left ? scx - 62 : scx + 62));
+  // CORRECCIÓN 27-oct (sin solapes, orden del usuario: "los
+  // cachos de los lados invaden el centro"): TODOS los vasos
+  // laterales van hacia FUERA (exterior de la mesa), nunca
+  // hacia el centro. La RONDA 2 (F3) los ponía hacia dentro
+  // arriba y eso, con la placa widget real de 132 px, hacía
+  // que el vaso superior-derecho tapara al vaso superior
+  // central en widget (geometría limpia, widget no). Hacia
+  // fuera, el vaso queda separado de su placa por la
+  // separación vertical (vaso abajo ≤ placa arriba − 3 px en
+  // widget, ver seat_layout.dart) y no invade el centro.
+  // Contrapartida honesta: a mesa corta el vaso superior
+  // exterior queda en parte fuera del óvalo de la foto (el
+  // óvalo se estrecha arriba); no tapa a ningún jugador.
+  // Offset 62 (no 67): hueco 5 px geométrico al avatar.
+  final cupCx = left ? scx - 62 : scx + 62;
   final cupTop = upper ? scy - 4 - 32 : scy - 6 - 32;
   return SketchSeat(
     angle,
@@ -506,11 +516,16 @@ SketchLayout sketchLayout({
   // Mi vaso y mis dados (banda inferior, hueco 104).
   final tableBottom = tableTop + tableH;
   final myCupBottom = tableBottom - 68;
-  final myCupH = compact ? 52.0 : 76.0;
+  // CORRECCIÓN 27-oct: vaso propio 72/44 (no 76/52) para que
+  // en compacto no toque la placa superior widget (su borde
+  // inferior quedaba 5 px dentro de mi vaso) y en completo
+  // quede aire con ella; el fondo sigue siendo tableBottom−68
+  // y el hueco a mi avatar (4 px) no cambia.
+  final myCupH = compact ? 44.0 : 72.0;
   final myCupW = compact ? 44.0 : 64.0;
   final myCup = SketchRect(
       'mi-vaso', cx - myCupW / 2, myCupBottom - myCupH, myCupW, myCupH);
-  final dieSize = compact ? 28.0 : 48.0;
+  final dieSize = compact ? 20.0 : 34.0;
   final diceTop = myCup.top + (compact ? 24.0 : 8.0);
   final n = myDiceCount;
   final leftCount = n ~/ 2;
@@ -564,12 +579,12 @@ SketchLayout sketchLayout({
   // manda y las placas inferiores desbordan bajo la mesa: residuo
   // medido, ver informe (a 390 y a mesa 206/250 no ocurre).
   final double mockupSideDy = screenH > 390
-      ? (tableH * 0.22).clamp(52.0, 95.0)
-      : 52.0;
+      ? (tableH * 0.22).clamp(58.0, 95.0)
+      : 58.0;
   // En pantallas anchas (> 844), distribuir los asientos a lo largo de las curvas
   // de la mesa como en el mockup (arreglo.md §3/§5), conservando 262 en 844.
   final double mockupSideX = screenW > 844
-      ? (screenW / 2 - 95).clamp(262.0, screenW * 0.38)
+      ? (screenW / 2 - 95).clamp(262.0, screenW / 2 - 160)
       : math.min(compact ? 200.0 : 262.0, screenW / 2 - 160);
   var mockupSideCy = cy - 18;
   final mockupSideCyMin = tableTop + 2 + mockupSideDy + 29;

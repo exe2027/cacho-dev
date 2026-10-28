@@ -9,6 +9,7 @@ import '../state/route_observer.dart';
 import '../state/audio.dart';
 import '../state/settings.dart';
 import '../state/wallet.dart';
+import '../widgets/carousel_fling.dart';
 import '../widgets/casino_anims.dart';
 import '../widgets/menu_transitions.dart';
 import '../table_themes.dart';
@@ -878,6 +879,12 @@ class _HomeScreenState extends State<HomeScreen>
             itemCount: _realPageCount,
             initialIndex: _carouselIndex,
             onIndexChanged: (newIdx) {
+              // El sonido no suena aquí: un cambio de una sala
+              // suena su ráfaga al inicio (_animateSteps), y un
+              // fling multi-sala suena un tack por paso al
+              // asentarse cada paso. Aquí solo se actualiza el
+              // índice (no al entrar al menú: el carrusel no llama
+              // a onIndexChanged en init).
               setState(() => _carouselIndex = newIdx);
             },
             itemBuilder: (context, index, isSelected) {
@@ -2118,6 +2125,15 @@ class _CircularRoomCarouselState extends State<_CircularRoomCarousel>
   double _pageOffset = 0.0; // [-1.0 .. 1.0]
   double _dragAccum = 0.0;
 
+  /// Fling multi-sala en curso: pasos que quedan (incluye el paso
+  /// actual) y dirección en índices (+1 = siguiente sala, -1 =
+  /// anterior). [_flingTotalSteps] distingue un cambio lento de
+  /// una sala (ráfaga de ruleta al inicio) de un barrido rápido
+  /// (un tack por sala al asentarse cada paso).
+  int _pendingSteps = 0;
+  int _pendingDir = 1;
+  int _flingTotalSteps = 0;
+
   int get currentIndex => _currentIndex;
 
   @override
@@ -2126,7 +2142,9 @@ class _CircularRoomCarouselState extends State<_CircularRoomCarousel>
     _currentIndex = widget.initialIndex;
     _animCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 320),
+      // Un paso dura 120 ms (carouselStepDurationMs): un fling
+      // de 3 salas tarda ~360 ms y cada tarjeta se ve pasar.
+      duration: const Duration(milliseconds: carouselStepDurationMs),
     )
       ..addListener(() {
         if (_offsetAnim != null) {
@@ -2137,14 +2155,30 @@ class _CircularRoomCarouselState extends State<_CircularRoomCarousel>
         if (status == AnimationStatus.completed) {
           final rounded = _pageOffset.round();
           if (rounded != 0) {
-            _currentIndex =
-                (_currentIndex - rounded + widget.itemCount) % widget.itemCount;
+            _currentIndex = (_currentIndex - rounded + widget.itemCount) %
+                widget.itemCount;
             _pageOffset = 0.0;
             widget.onIndexChanged?.call(_currentIndex);
+            // En un fling multi-sala, un tack por sala al
+            // asentarse el paso (tack tack tack). En un cambio
+            // de una sola sala ya sonó la ráfaga al inicio.
+            if (_flingTotalSteps > 1) {
+              AudioService.instance.tack();
+            }
           } else {
             _pageOffset = 0.0;
           }
-          setState(() {});
+          if (_pendingSteps > 0) {
+            _pendingSteps--;
+            if (_pendingSteps > 0) {
+              _startStep();
+            } else {
+              _flingTotalSteps = 0;
+              setState(() {});
+            }
+          } else {
+            setState(() {});
+          }
         }
       });
   }
@@ -2155,52 +2189,78 @@ class _CircularRoomCarouselState extends State<_CircularRoomCarousel>
     super.dispose();
   }
 
-  void next() {
-    if (_animCtrl.isAnimating) return;
-    _animateToOffset(-1.0);
+  /// Un paso de animación: desde el offset actual (0 tras un paso
+  /// anterior, o el arrastre del usuario en el primer paso) hasta
+  /// la tarjeta siguiente en la dirección del fling.
+  void _startStep() {
+    _offsetAnim = Tween<double>(
+      begin: _pageOffset,
+      end: -_pendingDir.toDouble(),
+    ).animate(
+      CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic),
+    );
+    _animCtrl.forward(from: 0.0);
   }
 
-  void previous() {
-    if (_animCtrl.isAnimating) return;
-    _animateToOffset(1.0);
+  /// Anima [steps] salas en dirección [dir] (+1 siguiente, -1
+  /// anterior), paso a paso. Si ya hay un fling en curso, la
+  /// petición nueva se ignora (el arrastre del usuario lo cancela
+  /// en _onDragStart). Con animaciones apagadas, salto directo
+  /// al índice final con una sola ráfaga de ruleta.
+  void _animateSteps(int dir, int steps) {
+    if (steps <= 0) return;
+    if (!CasinoAnims.enabledIn(context)) {
+      AudioService.instance.roulette();
+      _currentIndex =
+          (_currentIndex + dir * steps + widget.itemCount * steps) %
+              widget.itemCount;
+      _pageOffset = 0.0;
+      widget.onIndexChanged?.call(_currentIndex);
+      setState(() {});
+      return;
+    }
+    if (_animCtrl.isAnimating || _pendingSteps > 0) return;
+    _pendingDir = dir;
+    _pendingSteps = steps;
+    _flingTotalSteps = steps;
+    // Cambio lento de una sala: ráfaga de ruleta al inicio, como
+    // antes. Fling multi-sala: sin ráfaga; cada paso suena su
+    // tack al asentarse (ver el listener de completed).
+    if (steps == 1) AudioService.instance.roulette();
+    _startStep();
   }
+
+  void next() => _animateSteps(1, 1);
+
+  void previous() => _animateSteps(-1, 1);
 
   void goTo(int target) {
     if (target == _currentIndex) return;
     int diff = target - _currentIndex;
     if (diff > widget.itemCount ~/ 2) diff -= widget.itemCount;
     if (diff < -widget.itemCount ~/ 2) diff += widget.itemCount;
-
-    if (diff == 1) {
-      next();
-    } else if (diff == -1) {
-      previous();
-    } else {
-      setState(() {
-        _currentIndex = target % widget.itemCount;
-        _pageOffset = 0.0;
-      });
-      widget.onIndexChanged?.call(_currentIndex);
-    }
+    // Ir a una sala lejana ya no es un salto instantáneo: gira
+    // paso a paso por las intermedias, con tack por sala si son
+    // varias, o ráfaga si es solo la vecina.
+    _animateSteps(diff > 0 ? 1 : -1, diff.abs());
   }
 
   void _animateToOffset(double target) {
-    if (!CasinoAnims.enabledIn(context)) {
-      final rounded = target.round();
-      _currentIndex =
-          (_currentIndex - rounded + widget.itemCount) % widget.itemCount;
-      _pageOffset = 0.0;
-      widget.onIndexChanged?.call(_currentIndex);
-      setState(() {});
+    if (target == 0.0) {
+      // Volver al sitio: animación de retorno, sin sonido ni pasos.
+      _offsetAnim = Tween<double>(begin: _pageOffset, end: 0.0).animate(
+        CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic),
+      );
+      _animCtrl.forward(from: 0.0);
       return;
     }
-    _offsetAnim = Tween<double>(begin: _pageOffset, end: target).animate(
-      CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic),
-    );
-    _animCtrl.forward(from: 0.0);
+    _animateSteps(target < 0 ? 1 : -1, 1);
   }
 
   void _onDragStart(DragStartDetails details) {
+    // Agarrar el carrusel cancela cualquier fling en curso.
+    _pendingSteps = 0;
+    _flingTotalSteps = 0;
     _animCtrl.stop();
     _dragAccum = _pageOffset;
   }
@@ -2216,13 +2276,28 @@ class _CircularRoomCarouselState extends State<_CircularRoomCarousel>
 
   void _onDragEnd(DragEndDetails details) {
     final v = details.primaryVelocity ?? 0.0;
-    if (_pageOffset < -0.18 || v < -300) {
-      _animateToOffset(-1.0);
-    } else if (_pageOffset > 0.18 || v > 300) {
-      _animateToOffset(1.0);
-    } else {
+    // Sensibilidad: umbral de arrastre 0.08 de página (antes 0.18)
+    // y velocidad 150 px/s (antes 300). Un movimiento ligero y
+    // rápido ya dispara el giro; un toque o arrastre mínimo
+    // (velocidad < 150 Y distancia < 0.08) vuelve a su sitio sin
+    // cambiar de sala. La velocidad decide cuántas salas avanza:
+    // 150-600 = 1, 600-1400 = 2, 1400-2600 = 3, >= 2600 = 4.
+    final steps = carouselFlingSteps(
+      velocity: v,
+      offset: _pageOffset,
+      itemCount: widget.itemCount,
+    );
+    if (steps == 0) {
       _animateToOffset(0.0);
+      return;
     }
+    // La velocidad manda si supera el umbral; si no, el signo del
+    // arrastre (en home, arrastrar a la izquierda, offset/velocidad
+    // negativos, avanza a la sala siguiente, dir +1).
+    final dir = v.abs() >= 150
+        ? (v < 0 ? 1 : -1)
+        : (_pageOffset < 0 ? 1 : -1);
+    _animateSteps(dir, steps);
   }
 
   @override

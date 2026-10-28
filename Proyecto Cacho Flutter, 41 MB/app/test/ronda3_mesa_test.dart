@@ -11,7 +11,8 @@ import 'package:flutter_test/flutter_test.dart';
 /// informe en `audit/comparacion_ejemplo/ronda3_flutter.md`).
 /// Solo geometría pura, consola y presupuesto de revelación.
 void main() {
-  test('ronda3 F3e: vaso superior-central junto a su avatar', () {
+  test('ronda3 F3e SUPERADO 27-oct: vaso superior-central sin tapar la placa',
+      () {
     final l = sketchLayout(
       screenW: 844,
       screenH: 390,
@@ -21,14 +22,22 @@ void main() {
     );
     final byAngle = {for (final s in l.seats) s.angleDeg: s};
     final top = byAngle[270]!;
-    // Antes: vaso a cx + 92 de centro (left cx + 64), +10,9 puntos
-    // sobre el avatar. Ahora: hueco 5 px al avatar (radios
-    // 28 + 24 = 52; centro a 57).
-    expect(top.cup.left - top.avatar.right, 5);
-    expect(top.cup.cx - top.avatar.cx, 57);
-    expect(top.cup.cx, 479);
-    // La placa geométrica corrida a la izquierda (widget 132 =
-    // 340..472) no toca el vaso ni el avatar en rect.
+    // La RONDA 3 ponía el vaso a centro 57 (hueco 5 px) y con
+    // eso la placa widget de 132 px quedaba bajo el vaso y el
+    // vaso superior-derecho tapaba al central en widget. La
+    // corrección 27-oct lo corre a centro 76 (geom left cx+48,
+    // hueco 24 geom al avatar): el vaso widget empieza 12 px
+    // a la derecha de la placa widget y del avatar widget.
+    // CORRECCIÓN 28-oct (placa superior truncada): la placa
+    // de una línea pasa a 180 px, así que el vaso se corre
+    // otros 20 px (geom left cx+68, centro 96, hueco 44 geom
+    // al avatar): el vaso widget sigue empezando 12 px a la
+    // derecha de la placa widget (478..490 a 844×390).
+    expect(top.cup.left - top.avatar.right, 44);
+    expect(top.cup.cx - top.avatar.cx, 96);
+    expect(top.cup.cx, 518);
+    // La placa geométrica corrida a la izquierda no toca el
+    // vaso ni el avatar en rect.
     expect(top.plate.right, lessThanOrEqualTo(top.cup.left));
     expect(l.overlaps(), isEmpty);
   });
@@ -136,7 +145,8 @@ void main() {
     expect(cerrar.right, lessThanOrEqualTo(844));
   });
 
-  testWidgets('ronda3 F3d: mi placa solapa el avatar', (tester) async {
+  testWidgets('ronda3 F3d SUPERADO 27-oct: mi placa ya no solapa el avatar',
+      (tester) async {
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
         body: Center(
@@ -154,12 +164,18 @@ void main() {
     ));
     await tester.pump();
     expect(tester.takeException(), isNull);
-    // La placa baja 18 px sobre el avatar (era 8): el Transform
-    // de la rama below lleva offset (0, -18).
+    // La RONDA 3 subía la placa −18 px sobre el avatar (solape
+    // ~4,5 px). La corrección 27-oct la baja +2: queda 2 px por
+    // debajo del avatar, sin taparlo, y sigue 8 px antes de la
+    // consola (cuelga sobre la tira VER, zona central vacía).
     final transforms = tester.widgetList<Transform>(find.byType(Transform));
     expect(
-        transforms.any((t) => t.transform.getTranslation().y == -18), isTrue,
-        reason: 'ningún Transform con offset -18 en mi asiento');
+        transforms.any((t) => t.transform.getTranslation().y == 2), isTrue,
+        reason: 'ningún Transform con offset +2 en mi asiento');
+    expect(
+        transforms.any((t) => t.transform.getTranslation().y == -18),
+        isFalse,
+        reason: 'la placa ya no debe solapar el avatar con offset -18');
     // El avatar (64) y la placa (120 de ancho) siguen centrados.
     final plate = tester.getRect(find.text('Jugador'));
     expect(plate.width, lessThanOrEqualTo(120));

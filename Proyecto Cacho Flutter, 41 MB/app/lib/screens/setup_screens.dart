@@ -852,7 +852,12 @@ class FriendsSetupScreen extends StatefulWidget {
 
 class _FriendsSetupScreenState extends State<FriendsSetupScreen> {
   var _stake = 500;
-  var _tableTheme = defaultTableTheme;
+  // Rediseño CON AMIGOS (2026-10-28, por orden del usuario): ya no
+  // hay selector de mesa en esta página (ni El Pub, ni Casino, ni
+  // Neón). La sala creada usa siempre el tema por defecto Dorado
+  // (defaultTableTheme, lib/table_themes.dart) y el usuario no
+  // tiene que elegirlo ni entenderlo. El selector sigue intacto
+  // en CONTRA LA MÁQUINA (LocalSetupScreen), que no se tocó.
   late var _preset = widget.initialPreset;
 
   @override
@@ -886,73 +891,90 @@ class _FriendsSetupScreenState extends State<FriendsSetupScreen> {
                           color: CachoColors.gold)),
                 ),
               ),
-              // TODO HORIZONTAL: dos columnas (izquierda:
-              // intro/preset/mesa; derecha: apuesta + placa de
-              // billetera en línea). La placa ya no es pie: vive
-              // en la columna derecha, sin tapar nada.
+              // Rediseño CON AMIGOS (2026-10-28): una sola columna
+              // vertical, centrada y con scroll vertical — nunca
+              // scroll horizontal ni dos columnas de 320 px que
+              // dejaban la columna derecha fuera de pantalla y el
+              // texto de arriba recortado ("bots.") en la captura
+              // en vivo. Orden fijo, acorde al menú (fondo casino
+              // oscuro de menuDecoration + dorado mate, sin cian
+              // ni neón en ninguna parte): intro completa, reglas,
+              // apuesta por tiers, billetera en línea con su placa
+              // de pozo. El pie (CREAR + código + UNIRSE) sigue
+              // fijo debajo, fuera del scroll, como antes.
               Expanded(
-                child: _SetupColumns(
-                  left: [
-                    StaggerIn(
-                      index: 0,
-                      child: const Text(
-                        'Crea una sala y comparte el código, o únete '
-                        'con el código de un amigo. La sala puede '
-                        'rellenarse con bots.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            fontSize: 14, color: Colors.white70),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 640),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          StaggerIn(
+                            index: 0,
+                            child: const Text(
+                              'Crea una sala y comparte el código, o únete '
+                              'con el código de un amigo. La sala puede '
+                              'rellenarse con bots.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 14, color: Colors.white70),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          StaggerIn(
+                            index: 1,
+                            child: const Text('Reglas',
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: CachoColors.gold)),
+                          ),
+                          const SizedBox(height: 6),
+                          StaggerIn(
+                            index: 1,
+                            child: PresetRow(
+                              preset: _preset,
+                              onChanged: (v) =>
+                                  setState(() => _preset = v),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          StaggerIn(
+                            index: 2,
+                            child: StakePicker(
+                              value: _stake,
+                              balance: Wallet.instance.balance,
+                              onChanged: (v) =>
+                                  setState(() => _stake = v),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          StaggerIn(
+                            index: 3,
+                            // R17: línea a 14 px sobre la placa, sin
+                            // cifra local mezclada.
+                            child: const Text('Billetera en línea',
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: CachoColors.gold)),
+                          ),
+                          const SizedBox(height: 6),
+                          StaggerIn(
+                            index: 3,
+                            child: PotPlaque(
+                              formula:
+                                  'POZO = ${coinsText(_stake)} × jugadores al partir',
+                              saldoLine:
+                                  'La apuesta se cobra al partir la partida; el ganador se lleva el pozo completo.',
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    StaggerIn(
-                      index: 1,
-                      child: PresetRow(
-                        preset: _preset,
-                        onChanged: (v) => setState(() => _preset = v),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    StaggerIn(
-                      index: 3,
-                      child: TableThemePicker(
-                        value: _tableTheme,
-                        onChanged: (v) =>
-                            setState(() => _tableTheme = v),
-                      ),
-                    ),
-                  ],
-                  right: [
-                    StaggerIn(
-                      index: 2,
-                      child: StakePicker(
-                        value: _stake,
-                        balance: Wallet.instance.balance,
-                        onChanged: (v) => setState(() => _stake = v),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    StaggerIn(
-                      index: 4,
-                      // R17: línea a 14 px sobre la placa, sin
-                      // cifra local mezclada.
-                      child: const Text('Billetera en línea',
-                          style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: CachoColors.gold)),
-                    ),
-                    const SizedBox(height: 6),
-                    StaggerIn(
-                      index: 4,
-                      child: PotPlaque(
-                        formula:
-                            'POZO = ${coinsText(_stake)} × jugadores al partir',
-                        saldoLine:
-                            'La apuesta se cobra al partir la partida; el ganador se lleva el pozo completo.',
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
               // TODO HORIZONTAL: pie en una fila (CREAR + campo
@@ -980,7 +1002,9 @@ class _FriendsSetupScreenState extends State<FriendsSetupScreen> {
                                   Navigator.of(context).pop();
                                   widget.onCreate(
                                     stake: _stake,
-                                    tableTheme: _tableTheme,
+                                    // Sin selector en CON AMIGOS:
+                                    // tema por defecto Dorado.
+                                    tableTheme: defaultTableTheme,
                                     preset: _preset,
                                   );
                                 }

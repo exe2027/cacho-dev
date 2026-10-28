@@ -965,24 +965,54 @@ class PlayerSeat extends StatelessWidget {
       Widget plateCol;
       if (singleLinePlate) {
         // Una línea de alto: las 5 pipas primero y el nombre
-        // después (27-oct: sin "×N"). El ancho 132 se mantiene
-        // (RONDA 2 F4/F6) y el Tooltip devuelve el nombre
-        // completo + el conteo si un apodo largo lo supera.
-        // El Positioned del llamador (_sketchRivalSeat) ya
-        // ensancha a 132, así que la restricción no comprime
-        // al hijo.
+        // después (27-oct: sin "×N"). CORRECCIÓN 28-oct (placa
+        // superior truncada): el ancho ya NO es 132 fijo sino
+        // plateWidth (180 en el asiento superior, 132 en los
+        // demás de una línea), y el contenido se compacta solo
+        // en esta rama: nombre a 12 px (no 14) y pipas de 7 px
+        // (no 9). Medido con TextPainter: "El Huaso" = 112 px
+        // a 14 px pero 96 px a 12 px; 96 + pipas 47 + gap 6 +
+        // padding 12 = 161 ≤ 180, así que ya no se elipsa.
+        // Con 132 (rama vieja) solo quedaban 53 px para el
+        // nombre y se leía "El H…": esa era la causa raíz, no
+        // un vaso tapando el texto. El Tooltip sigue devolviendo
+        // el nombre completo + el conteo si un apodo más largo
+        // lo supera.
+        final singleLinePips = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < 5; i++)
+              Container(
+                width: 7,
+                height: 7,
+                margin: const EdgeInsets.symmetric(horizontal: 1.2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: i < diceCount
+                      ? (isTurn ? ringColor : CachoColors.ivory)
+                      : Colors.white.withValues(alpha: 0.35),
+                  border: Border.all(
+                    color: i < diceCount
+                        ? Colors.transparent
+                        : Colors.white.withValues(alpha: 0.6),
+                    width: 1.2,
+                  ),
+                ),
+              ),
+          ],
+        );
         plateCol = Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
-              width: 132,
+              width: plateWidth,
               child: Tooltip(
                 message: '$nickname · $diceCount dados',
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    dicePips,
+                    singleLinePips,
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
@@ -990,7 +1020,7 @@ class PlayerSeat extends StatelessWidget {
                         maxLines: 1,
                         textAlign: TextAlign.center,
                         overflow: TextOverflow.ellipsis,
-                        style: nameStyle,
+                        style: nameStyle.copyWith(fontSize: 12),
                       ),
                     ),
                   ],
@@ -1060,21 +1090,21 @@ class PlayerSeat extends StatelessWidget {
           children: [avatar, const SizedBox(width: 6), plateCol],
         );
       } else {
-        // RONDA 3 (F3d): la placa SOLAPA el borde inferior del
-        // avatar como las rivales (solape ~4 px medido en
-        // captura). Con −8 quedaba un hueco de ~5,5 px entre el
-        // borde visible del círculo y la placa (el círculo
-        // visible es menor que la caja 64 del avatar: el fondo
-        // Blobatar no llena la caja); con −18 el solape medido
-        // queda en ~4,5 px. Solo la usa el asiento propio (los
-        // rivales pintan su placa en un Positioned aparte con
-        // −8 sobre un hueco de 2, o sea, solape ~4).
+        // CORRECCIÓN 27-oct (sin solapes): la placa ya NO
+        // solapa el borde inferior del avatar (la RONDA 3 F3d
+        // la subía −18 para un solape ~4,5 px medido, y las
+        // rivales usaban −8). Ahora baja +2: queda 2 px por
+        // debajo del avatar, sin taparlo, y su borde inferior
+        // sigue 8 px antes de la consola (la placa cuelga
+        // sobre la tira VER, cuya zona central está vacía).
+        // Solo la usa el asiento propio (las rivales pintan
+        // su placa en un Positioned aparte, ver game_screen).
         body = Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             avatar,
             Transform.translate(
-              offset: const Offset(0, -18),
+              offset: const Offset(0, 2),
               child: plateCol,
             ),
           ],

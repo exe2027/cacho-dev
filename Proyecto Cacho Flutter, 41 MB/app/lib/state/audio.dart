@@ -38,6 +38,7 @@ class AudioService {
 
   Future<void> _play(String file, {double volume = 0.9}) async {
     if (!Settings.instance.soundEffects) return;
+    debugPlayListener?.call(file);
     try {
       final player = _player ??= AudioPlayer();
       await player.stop();
@@ -83,6 +84,97 @@ class AudioService {
 
   /// Turno de otro jugador: clic suave de aviso.
   void tick() => _play('tick.wav', volume: 0.16);
+
+  /// Gancho solo de diagnóstico/tests: se llama cada vez que _play
+  /// realmente intenta sonar (después del guard de efectos), con el
+  /// archivo. En producción nadie lo asigna; no afecta al audio.
+  static void Function(String file)? debugPlayListener;
+
+  /// Pool de reproductores solo para ticks de ruleta. Causa raíz
+  /// de que el tack no se oyera: _play() usa UN solo reproductor y
+  /// hace stop() antes de cada sonido, y la ráfaga de ruleta NO
+  /// espera a _play. Con tick.wav de 50 ms e intervalos de 42 ms,
+  /// el tick siguiente cortaba al anterior antes de terminar, y
+  /// en iPhone/Safari esa carrera stop/play dejaba el sonido en
+  /// silencio. Con 4 reproductores en rotación, un tick nunca
+  /// corta al anterior (el mismo reproductor se reutiliza cada
+  /// ~4 ticks, más de los 50 ms que dura el sonido) y NO se hace
+  /// stop() antes de sonar.
+  final List<AudioPlayer> _tickPlayers = [];
+  int _tickPlayerIndex = 0;
+
+  Future<void> _playTick(String file, {double volume = 0.45}) async {
+    if (!Settings.instance.soundEffects) return;
+    debugPlayListener?.call(file);
+    try {
+      // El pool crece de uno en uno, nunca de golpe: crear un
+      // AudioPlayer dispara una inicialización asíncrona cuyo
+      // error solo queda capturado si alguien espera su creación
+      // antes de que complete. Crear 4 de golpe dejaba 3
+      // creatingCompleter sin listener y su error se reportaba
+      // como no capturado (en tests, como fallo). Aquí, cada
+      // reproductor nuevo se usa (setVolume) en la misma llamada
+      // que lo crea, así que su error queda dentro de este try.
+      final AudioPlayer player;
+      if (_tickPlayers.length < 4) {
+        player = AudioPlayer();
+        _tickPlayers.add(player);
+      } else {
+        player = _tickPlayers[_tickPlayerIndex];
+        _tickPlayerIndex = (_tickPlayerIndex + 1) % _tickPlayers.length;
+      }
+      await player.setVolume(volume);
+      await player.play(AssetSource('sounds/$file'));
+    } catch (_) {
+      // Sin audio (web sin gesto previo, tests, etc.): sigue.
+    }
+  }
+
+  /// Intervalos (ms) entre los ticks de la ruleta: desaceleran como
+  /// la bola al asentarse. 6 ticks, ~342 ms audibles en total
+  /// (292 ms de intervalos + el último tick de ~50 ms). El carrusel
+  /// desliza rápido (120 ms por paso) y la ruleta se dispara al
+  /// inicio del deslizamiento, así que el "tack" se oye durante el
+  /// movimiento y termina justo después, sin tapar la música.
+  static const List<int> rouletteIntervalsMs = [42, 48, 56, 66, 80];
+
+  /// Contador para cortar una ráfaga de ruleta anterior cuando
+  /// llega otra selección o un tack de fling: barrer rápido el
+  /// carrusel no apila ráfagas. Ojo: el contador solo cancela los
+  /// ticks PENDIENTES de la ráfaga; un tack ya sonado nunca se
+  /// corta, porque _playTick no hace stop() y usa el pool.
+  int _rouletteSeq = 0;
+
+  /// Un solo tack claro al pasar por una sala durante un fling
+  /// multi-sala: no es una ráfaga, es un tick único, más fuerte
+  /// que el tick viejo (0.45 frente a 0.22) para que se oiga sobre
+  /// la música de casino (0.30). Cancela cualquier ráfaga de
+  /// ruleta pendiente, pero el tack en sí nunca se cancela.
+  void tack() {
+    _rouletteSeq++;
+    _playTick('tick.wav', volume: 0.45);
+  }
+
+  /// Sonido de ruleta al cambiar de sala seleccionada (cambio
+  /// lento, una sola sala): ráfaga de ticks de tick.wav (asset ya
+  /// existente, sintetizado, sin licencia externa) con intervalos
+  /// crecientes, por _playTick (pool, sin stop previo) para que
+  /// ningún tick corte al anterior. Respeta el interruptor de
+  /// efectos (Settings.soundEffects) y NO depende del interruptor
+  /// de música: con música apagada y efectos encendidos, la ruleta
+  /// sigue sonando como los demás SFX.
+  Future<void> roulette() async {
+    if (!Settings.instance.soundEffects) return;
+    final seq = ++_rouletteSeq;
+    for (var i = 0; i <= rouletteIntervalsMs.length; i++) {
+      if (seq != _rouletteSeq || !Settings.instance.soundEffects) return;
+      _playTick('tick.wav',
+          volume: i == rouletteIntervalsMs.length ? 0.45 : 0.35);
+      if (i < rouletteIntervalsMs.length) {
+        await Future.delayed(Duration(milliseconds: rouletteIntervalsMs[i]));
+      }
+    }
+  }
 
   /// Pitido de apuro: últimos segundos de mi turno (aro en rojo).
   void beep() => _play('beep.wav', volume: 0.9);

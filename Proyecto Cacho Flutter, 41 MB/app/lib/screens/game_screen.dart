@@ -16,6 +16,7 @@ import '../table_themes.dart';
 import '../texts.dart';
 import '../theme.dart';
 import '../widgets/dice_and_cup.dart';
+import '../widgets/dice_throw.dart';
 import '../widgets/sketch_layout.dart';
 import '../widgets/panels.dart';
 import '../widgets/casino_anims.dart';
@@ -1850,7 +1851,21 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     return Stack(
       clipBehavior: Clip.none,
       children: [
+        // Asientos rivales: avatar + placa + vaso, cada uno en su
+        // rect exacto del layout. Desde 7 rivales el layout usa
+        // arco igual (ver sketch_layout.dart); la guardia
+        // i < layout.seats.length solo cubre un layout corto, no
+        // oculta rivales: sketch_layout_test exige 0 solapes
+        // hasta 11 rivales (P5).
+        for (var i = 0; i < others.length && i < layout.seats.length; i++)
+          ..._sketchRivalSeat(
+              others[i], layout.seats[i], others.length >= 7, screenW),
         // Pozo arriba al centro (bosquejo): UNA fila —
+        // CORRECCIÓN 27-oct (capas): el pozo pinta DESPUÉS de los
+        // asientos rivales (mesa < cachos < dados < avatares <
+        // nameplates < pozo < UI), así su pastilla nunca queda
+        // tapada por un asiento; geométricamente tampoco se toca
+        // con ninguno (ver seat_layout.dart).
         // etiqueta POZO + vaso pequeño 30×36 + monto REAL
         // potFixed. Corrección 25-oct: el vaso ya NO es enorme
         // al centro ni tapa "CACHO O DUDO". El vaso propio
@@ -1882,7 +1897,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           left: layout.pot.left - 20,
           top: layout.pot.top - 56,
           width: layout.pot.width + 40,
-          height: 36,
+          // CORRECCIÓN 27-oct: alto 32 (no 36) para que la
+          // pastilla no toque al avatar superior widget, que
+          // empieza 4 px por encima de su rect geométrico.
+          height: 32,
           child: Center(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
@@ -1944,19 +1962,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             ),
           ),
         ),
-        // Asientos rivales: avatar + placa + vaso, cada uno en su
-        // rect exacto del layout. Desde 7 rivales el layout usa
-        // arco igual (ver sketch_layout.dart); la guardia
-        // i < layout.seats.length solo cubre un layout corto, no
-        // oculta rivales: sketch_layout_test exige 0 solapes
-        // hasta 11 rivales (P5).
-        for (var i = 0; i < others.length && i < layout.seats.length; i++)
-          ..._sketchRivalSeat(
-              others[i], layout.seats[i], others.length >= 7, screenW),
         // Mi escenario (vaso + dados con hueco 104).
         Positioned(
           left: layout.myCup.cx - 165,
-          top: layout.myCup.top - 56 + (compact ? 52 : 76) - 140 + 7,
+          top: layout.myCup.top - 56 + (compact ? 44 : 72) - 140 + 7,
           child: _myStageSketch(compact: compact),
         ),
         // Mi asiento (RONDA 2, F4): placa CENTRADA BAJO mi avatar
@@ -2054,11 +2063,30 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     // izquierda del layout (la superior corrida queda en
     // 222..354, sin tocar mi vaso) y con tope al borde derecho
     // de la pantalla para las placas de la derecha.
-    final plateW = max(geom.plate.width, 132.0);
-    final plateLeft = max(0.0, min(geom.plate.left, screenW - plateW));
+    // CORRECCIÓN 28-oct (placa superior truncada): ese 132 ya
+    // no basta para la placa de UNA línea del asiento superior
+    // (singleLinePlate): dentro caben pipas (61) + gap (6) +
+    // nombre, y "El Huaso" solo ya mide 112 px a 14 px, así que
+    // en 132 solo quedaban 53 px para el nombre y se leía
+    // "El H…". La superior pasa a 180 (nombre a 12 px = 96 px
+    // + pipas compactas de 7 px = 47 px + gap 6 + padding 12 =
+    // 161 ≤ 180); las demás placas de una línea (ángulos 60/120
+    // forzados) siguen en 132, sin regresión respecto a antes.
+    final plateW =
+        geom.singleLinePlate ? 180.0 : max(geom.plate.width, 132.0);
+    // CORRECCIÓN 27-oct: la placa se CENTRA en el centro
+    // geométrico (antes empezaba en geom.plate.left, con lo que
+    // una placa de 132 px sobresalía 44 px hacia el centro y
+    // quedaba bajo los vasos vecinos) y su top pasa de −8 a +4:
+    // con −8 la placa widget empezaba 9 px por encima del
+    // borde inferior del avatar widget y bajo el vaso (solape
+    // real en la foto); con +4 queda 2–3 px por debajo del
+    // avatar, sin tocarlo ni al vaso (ver seat_layout.dart).
+    final plateLeft =
+        max(0.0, min(geom.plate.cx - plateW / 2, screenW - plateW));
     final plate = Positioned(
       left: plateLeft,
-      top: geom.plate.top - 56 - 8,
+      top: geom.plate.top - 56 + 4,
       width: plateW,
       child: PlayerSeat(
         nickname: shortNick,
@@ -2117,7 +2145,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             ),
           )
         : null;
-    return [avatar, plate, cup, if (emoteBubble != null) emoteBubble];
+    // CORRECCIÓN 27-oct (capas): dentro del asiento el vaso
+    // pinta PRIMERO y la placa ÚLTIMA (vaso < avatar < placa),
+    // así ninguna nameplate queda tapada por un vaso aunque
+    // dos rectángulos se tocaran; la geometría (seat_layout)
+    // además garantiza que no se tocan.
+    return [cup, avatar, plate, if (emoteBubble != null) emoteBubble];
   }
 
   Widget _mySeatSketch() {
@@ -2200,14 +2233,20 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             final entryDrop = (1 - _entryCtrl.value) * 80;
             final squash = 1 - 0.07 * sin(_squashCtrl.value * pi);
             final cupW = compact ? 44.0 : 64.0;
-            final cupH = compact ? 52.0 : 76.0;
+            // CORRECCIÓN 27-oct: vaso propio 72/44, igual que
+            // en sketch_layout (antes 76/52, que en compacto
+            // tocaba la placa superior widget).
+            final cupH = compact ? 44.0 : 72.0;
             final cupLeft = (330 - cupW) / 2;
             final coasterW = CachoCup.coasterWidthFor(cupW);
             final coasterH = coasterW / 3.0;
             final shadowW = cupW * 0.9 * (1.0 - 0.25 * lift) + hopY;
             final shadowA = ((0.45 - 0.2 * lift) + hopY * 0.006).clamp(0.08, 0.5);
             final nDice = c.myHand.length;
-            final dieSize = compact ? 32.0 : 46.0;
+            // CORRECCIÓN 27-oct: dados ~30% más chicos
+            // (46→32, 32→22) para que la banda propia no quede
+            // pegada al avatar ni a la placa superior.
+            final dieSize = compact ? 22.0 : 32.0;
             final totalDiceW = nDice == 0
                 ? 0.0
                 : nDice * dieSize + (nDice - 1) * 4.0;
@@ -2241,15 +2280,36 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   ),
                 ),
                 // 3. Mis dados agrupados y centrados sobre el posavasos/mesa
+                // ANIMACIÓN 27-oct (tirada): al levantar el vaso con
+                // VER, cada dado vuela desde debajo del cacho con
+                // arco y dos rebotes hasta su posición final
+                // (ThrownDie en dice_throw.dart). La cara nunca
+                // cambia y la posición final es la misma de antes,
+                // así que no se rompen las separaciones sin solape.
+                // Con animaciones apagadas (AN17 o reduce-motion)
+                // ThrownDie pinta el dado directo, como hoy.
                 Positioned(
-                  bottom: compact ? 8 : 12,
+                  // CORRECCIÓN 27-oct: dados 8 px más arriba
+                  // (bottom 20/16, no 12/8) para dejar ≥12 px
+                  // libres hasta mi avatar (antes quedaban 9).
+                  bottom: compact ? 16 : 20,
                   left: diceLeft,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       for (var i = 0; i < nDice; i++) ...[
                         if (i > 0) const SizedBox(width: 4),
-                        _cubeDie(i, lift, size: dieSize, blender: false),
+                        ThrownDie(
+                          index: i,
+                          count: nDice,
+                          dieSize: dieSize,
+                          gap: 4,
+                          active: lift > 0.5,
+                          enabled: CasinoAnims.enabledIn(context) &&
+                              !_s.reducedEffects,
+                          child: _cubeDie(i, lift,
+                              size: dieSize, blender: false),
+                        ),
                       ],
                     ],
                   ),

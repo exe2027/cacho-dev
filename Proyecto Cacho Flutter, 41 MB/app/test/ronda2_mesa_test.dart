@@ -6,8 +6,13 @@ import 'package:flutter_test/flutter_test.dart';
 /// Solo geometría pura del layout: la dirección de los vasos
 /// mockup-6 (F3) y que el cambio no rompa el 0 solapes.
 void main() {
-  test('ronda2 F3: vasos superiores hacia dentro, inferiores hacia fuera',
+  test('ronda2 F3 SUPERADO 27-oct: vasos laterales hacia fuera',
       () {
+    // La RONDA 2 ponía los vasos superiores hacia dentro; la
+    // corrección 27-oct (orden del usuario: "los cachos de los
+    // lados invaden el centro") los pone TODOS hacia fuera:
+    // hacia dentro, el vaso superior-derecho tapaba en widget
+    // al vaso superior central (geometría limpia, widget no).
     for (final h in [390.0, 350.0]) {
       final l = sketchLayout(
         screenW: 844,
@@ -17,13 +22,11 @@ void main() {
         consoleH: h >= 390 ? 72.0 : 64.0,
       );
       final byAngle = {for (final s in l.seats) s.angleDeg: s};
-      // Superior-izquierda (225) y superior-derecha (315): el vaso
-      // va hacia el centro (dentro del óvalo), no hacia fuera.
-      expect(byAngle[225]!.cup.cx, greaterThan(byAngle[225]!.avatar.cx));
-      expect(byAngle[315]!.cup.cx, lessThan(byAngle[315]!.avatar.cx));
-      // Inferior-izquierda (135) e inferior-derecha (45): hacia
-      // fuera como siempre, junto al avatar (hueco 5 px: centro
-      // del vaso a 62 del centro del avatar, radios 28 + 29 = 57).
+      // Superior-izquierda (225) y superior-derecha (315): hacia
+      // fuera, como los inferiores (hueco 5 px geométrico:
+      // centro del vaso a 62 del centro del avatar).
+      expect(byAngle[225]!.cup.cx, lessThan(byAngle[225]!.avatar.cx));
+      expect(byAngle[315]!.cup.cx, greaterThan(byAngle[315]!.avatar.cx));
       expect(byAngle[135]!.cup.cx, lessThan(byAngle[135]!.avatar.cx));
       expect(byAngle[45]!.cup.cx, greaterThan(byAngle[45]!.avatar.cx));
       final upLeftGap = byAngle[225]!.avatar.cx - byAngle[225]!.cup.cx;
