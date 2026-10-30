@@ -12,12 +12,12 @@ import '../state/app_viewport.dart';
 import '../state/audio.dart';
 import '../state/match_controller.dart';
 import '../state/settings.dart';
+import '../table_geometry.dart';
 import '../table_themes.dart';
 import '../texts.dart';
 import '../theme.dart';
 import '../widgets/dice_and_cup.dart';
 import '../widgets/sketch_layout.dart';
-import '../widgets/mesa_bg_painter.dart';
 import '../widgets/panels.dart';
 import '../widgets/casino_anims.dart';
 import '../widgets/coin_widgets.dart';
@@ -65,6 +65,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   late final AnimationController _entryCtrl;
   StreamSubscription<AccelerometerEvent>? _accelSub;
   Timer? _ringTicker;
+  final Stream<int> _elapsedTicks =
+      Stream.periodic(const Duration(seconds: 1), (i) => i);
   // Pitidos de apuro: en qué turno se pitaron ya qué segundos (3, 2, 1),
   // para pitar cada uno una sola vez por turno.
   DateTime? _beepTurnEndsAt;
@@ -820,13 +822,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         decoration: landscapeRoomDecoration(c.tableTheme),
         child: Stack(
           children: [
-            // Fondo 3D de la mesa: pintor personalizado que no se
-            // distorsiona, mantiene aspecto perfecto sin problemas
-            // de alineación en desktop/mobile.
+            // Recuperar la fotografía temática; un gradiente plano no
+            // representa la mesa ni da referencia visual a los asientos.
             Positioned.fill(
               child: RepaintBoundary(
-                child: CustomPaint(
-                  painter: MesaBgPainter(theme: _themeForMesa(c.stake)),
+                child: Image.asset(
+                  _mesaFondoAsset(c.stake),
+                  fit: BoxFit.cover,
                 ),
               ),
             ),
@@ -836,7 +838,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 child: DecoratedBox(decoration: roomVignette),
               ),
             ),
-
 
             // Tinte del tier en partida (11b): en partida el tier
             // manda sobre el selector de tema (P13 pendiente: el
@@ -1051,7 +1052,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   if (c.phase == 'finished' && c.uiResolution == null)
                     _winnerOverlay(),
                   // Botón flotante de Chat / Emotes (mockup.jpeg)
-                  if (c.phase == 'playing' && c.uiResolution == null && !kamikaze)
+                  if (c.phase == 'playing' &&
+                      c.uiResolution == null &&
+                      !kamikaze)
                     Positioned(
                       left: 12,
                       bottom: _landscapeConsoleOpen ? 66 : 12,
@@ -1215,7 +1218,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             decoration: BoxDecoration(
               color: const Color(0xFF1B2434).withValues(alpha: 0.88),
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: CachoColors.gold.withValues(alpha: 0.45)),
+              border:
+                  Border.all(color: CachoColors.gold.withValues(alpha: 0.45)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -1238,7 +1242,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     shape: BoxShape.circle,
                   ),
                   child: const Center(
-                    child: Icon(Icons.add, size: 12, color: CachoColors.menuMid),
+                    child:
+                        Icon(Icons.add, size: 12, color: CachoColors.menuMid),
                   ),
                 ),
               ],
@@ -1250,7 +1255,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             decoration: BoxDecoration(
               color: const Color(0xFF1B2434).withValues(alpha: 0.88),
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: const Color(0xFF34C759).withValues(alpha: 0.45)),
+              border: Border.all(
+                  color: const Color(0xFF34C759).withValues(alpha: 0.45)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -1290,8 +1296,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     Widget potPill({bool tight = false}) {
       return Container(
         // RONDA 3 (F3c): 10 → 8, aire para la apuesta.
-        padding: EdgeInsets.symmetric(
-            horizontal: 8, vertical: tight ? 2 : 4),
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: tight ? 2 : 4),
         decoration: BoxDecoration(
           color: const Color(0xFF1B2434).withValues(alpha: 0.94),
           borderRadius: BorderRadius.circular(999),
@@ -1339,32 +1344,32 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       );
     }
 
-    /// Indicador de ronda con cronómetro en la barra superior.
-    /// Muestra: "R1 · Mansión · 00:45"
     Widget roundInfo() {
       if (!c.gameStarted || c.gameStartTime == null) {
         return const SizedBox.shrink();
       }
-
+      final roomName =
+          c.guided ? tableThemeName(c.tableTheme) : stakeTierName(c.stake);
       return StreamBuilder<int>(
-        stream: Stream.periodic(const Duration(seconds: 1), (i) => i),
-        builder: (context, snapshot) {
+        stream: _elapsedTicks,
+        builder: (context, _) {
           final elapsed = DateTime.now().difference(c.gameStartTime!);
-          final minutes = elapsed.inMinutes.toString().padLeft(2, '0');
-          final seconds = (elapsed.inSeconds % 60).toString().padLeft(2, '0');
-          final rnum = (c.round + 1).clamp(1, 3);
-          
-          // Extraer nombre de sala del roomCode o usar nombre por defecto
-          final roomName = c.roomCode != null 
-            ? c.roomCode!.split('-').first.toUpperCase()
-            : (c.guided ? 'GUIADA' : 'LOCAL');
-
-          return Text(
-            'R$rnum · $roomName · $minutes:$seconds',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: CachoColors.ivory,
+          final seconds = max(0, elapsed.inSeconds);
+          final clock =
+              '${(seconds ~/ 60).toString().padLeft(2, '0')}:${(seconds % 60).toString().padLeft(2, '0')}';
+          final label = 'R${max(1, c.round)} · $roomName · $clock';
+          return Tooltip(
+            message: label,
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: CachoColors.ivory,
+              ),
             ),
           );
         },
@@ -1632,8 +1637,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
     return LayoutBuilder(
       builder: (context, cons) {
-        if (cons.maxWidth >= 640) {
-          // Ancho: una fila como el mockup.
+        if (cons.maxWidth >= 1000) {
+          // Una fila solo cuando cabe ronda + saldo + turno + apuesta + controles.
           return SizedBox(
             height: _sketchBarH,
             child: Column(
@@ -1647,8 +1652,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         exitPill(),
                         const SizedBox(width: 6),
                         balancePill(),
-                        const SizedBox(width: 6),
-                        roundInfo(),
+                        if (c.gameStarted) ...[
+                          const SizedBox(width: 6),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 210),
+                            child: roundInfo(),
+                          ),
+                        ],
                         Expanded(
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -1706,8 +1716,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                 // En mi turno no cambia nada
                                 // (turno intrínseco + apuesta
                                 // Flexible, piso ronda 3).
-                                Flexible(
-                                    flex: 3, child: _currentBidChip()),
+                                Flexible(flex: 3, child: _currentBidChip()),
                               ],
                             ],
                           ),
@@ -1736,7 +1745,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             ),
           );
         }
-        // Angosto (< 640, p. ej. 390 px): dos filas para que todo
+        // Angosto (< 1000): dos filas para que ronda y apuesta
         // quepa a 14 px sin solapes (la fila 2 se recorta con
         // elipsis en el peor caso: ver comentario de _sketchTopBar).
         return SizedBox(
@@ -1777,8 +1786,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       if (showPot) potPill(tight: true),
-                      if (showPot && (playing || cur != null))
+                      if (showPot && (c.gameStarted || playing || cur != null))
                         const SizedBox(width: 6),
+                      if (c.gameStarted) ...[
+                        Flexible(flex: 2, child: roundInfo()),
+                        if (playing || cur != null) const SizedBox(width: 4),
+                      ],
                       if (playing)
                         // Prioridad fila 2 (ver comentario): la
                         // apuesta lleva flex 2 y el turno flex 1;
@@ -1787,8 +1800,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         myTurn
                             ? turnPillCompact()
                             : Flexible(flex: 1, child: turnPillCompact())
-                      else
-                        Flexible(child: roundInfo()),
+                      else if (!c.gameStarted)
+                        Flexible(child: roomInfo()),
                       if (cur != null) ...[
                         const SizedBox(width: 6),
                         Flexible(flex: myTurn ? 1 : 2, child: bidChipCompact()),
@@ -1847,37 +1860,32 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     );
   }
 
-
-
-
-  /// Mapeo de stakes a temas de mesa temáticos.
-  /// 100: Taberna (rústica, bohemia)
-  /// 250: Salón (billar clásico)
-  /// 500: Casino (profesional, carbón)
-  /// 1000: Mansión (elegante, dorado)
-  /// 2500: Highroller (lujo, púrpura/burdeos)
-  String _themeForMesa(int stake) {
-    switch (stake) {
-      case 100:
-        return 'taberna';
-      case 250:
-        return 'salon';
-      case 500:
-        return 'casino';
-      case 1000:
-        return 'mansion';
-      case 2500:
-        return 'highroller';
-      default:
-        return 'casino'; // Defecto
-    }
+  /// Fotos de las salas por apuesta; coinciden con los nombres del tier.
+  String _mesaFondoAsset(int stake) {
+    return switch (stake) {
+      100 => 'assets/images/mesa_mockup_clean.jpg',
+      250 => 'assets/images/mesa_salon_3d.jpg',
+      500 => 'assets/images/mesa_casino_3d.jpg',
+      1000 => 'assets/images/mesa_vip_3d.jpg',
+      2500 => 'assets/images/mesa_highroller_3d.jpg',
+      _ => 'assets/images/mesa_mockup_clean.jpg',
+    };
   }
 
-  /// Mesa personalizada: fondo pintado dinámicamente (sin distorsión),
-            /// pozo arriba al centro con su vaso y monto real, asientos y vasos
-            /// distribuidos según sketch_layout (arreglo.md).
+  /// Asientos, vasos y pozo comparten la geometría de TableGeometry.
   Widget _sketchTable(List<PlayerView> others, double tableH, bool compact) {
     final screenW = MediaQuery.sizeOf(context).width;
+    
+    // Generar geometría de la mesa con TableGeometryGenerator
+    final geometry = TableGeometryGenerator.generate(
+      screenWidth: screenW,
+      screenHeight: 56 + tableH + 72,
+      barTop: 56,
+      consoleHeight: 72,
+      playerCount: 1 + others.length,
+    );
+    
+    // Mantener compatibilidad: usar sketchLayout solo para obtener compact
     final layout = sketchLayout(
       screenW: screenW,
       screenH: 56 + tableH + 72,
@@ -1885,8 +1893,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       myDiceCount: c.myHand.length,
       consoleH: 72,
     );
-    // Use layout.compact (unified source of truth) instead of the
-    // widget-layer compact parameter, which was calculated differently.
     final layoutCompact = layout.compact;
 
     return Stack(
@@ -1921,9 +1927,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         // a 8 choca con un vaso rival y en ambos casos tapa el
         // watermark).
         Positioned(
-          left: layout.pot.left - 20,
-          top: layout.pot.top - 56,
-          width: layout.pot.width + 40,
+          left: geometry.potRect.left - 20,
+          top: geometry.potRect.top,
+          width: geometry.potRect.width + 40,
           height: 36,
           child: Center(
             child: Container(
@@ -1986,15 +1992,15 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             ),
           ),
         ),
-        // Asientos rivales: avatar + placa + vaso, cada uno en su
-        // rect exacto del layout. Desde 7 rivales el layout usa
-        // arco igual (ver sketch_layout.dart); la guardia
-        // i < layout.seats.length solo cubre un layout corto, no
-        // oculta rivales: sketch_layout_test exige 0 solapes
-        // hasta 11 rivales (P5).
-        for (var i = 0; i < others.length && i < layout.seats.length; i++)
+        // Asientos rivales: avatar + placa + vaso desde geometry.
+        // Se adaptan las coordenadas de TableGeometry a SketchSeat
+        // para mantener compatibilidad con _sketchRivalSeat.
+        for (var i = 0; i < others.length && i < geometry.seats.length; i++)
           ..._sketchRivalSeat(
-              others[i], layout.seats[i], others.length >= 7, screenW),
+              others[i],
+              _seatGeometryToSketchSeat(geometry.seats[i]),
+              others.length >= 7,
+              screenW),
         // Mi escenario (vaso + dados con hueco 104).
         Positioned(
           left: layout.myCup.cx - 165,
@@ -2247,12 +2253,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             final coasterW = CachoCup.coasterWidthFor(cupW);
             final coasterH = coasterW / 3.0;
             final shadowW = cupW * 0.9 * (1.0 - 0.25 * lift) + hopY;
-            final shadowA = ((0.45 - 0.2 * lift) + hopY * 0.006).clamp(0.08, 0.5);
+            final shadowA =
+                ((0.45 - 0.2 * lift) + hopY * 0.006).clamp(0.08, 0.5);
             final nDice = c.myHand.length;
             final dieSize = compact ? 32.0 : 46.0;
-            final totalDiceW = nDice == 0
-                ? 0.0
-                : nDice * dieSize + (nDice - 1) * 4.0;
+            final totalDiceW =
+                nDice == 0 ? 0.0 : nDice * dieSize + (nDice - 1) * 4.0;
             final diceLeft = (330 - totalDiceW) / 2;
             return Stack(
               alignment: Alignment.bottomCenter,
@@ -2499,7 +2505,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, size: 20, color: Colors.white70),
+                      icon: const Icon(Icons.close,
+                          size: 20, color: Colors.white70),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                       onPressed: () => Navigator.of(sheetCtx).pop(),
@@ -2530,7 +2537,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                               ),
                             ),
                             child: Center(
-                              child: Text(g, style: const TextStyle(fontSize: 24)),
+                              child:
+                                  Text(g, style: const TextStyle(fontSize: 24)),
                             ),
                           ),
                         ),
@@ -2544,7 +2552,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   children: [
                     for (final p in phrases)
                       ActionChip(
-                        avatar: Text(p.$1, style: const TextStyle(fontSize: 15)),
+                        avatar:
+                            Text(p.$1, style: const TextStyle(fontSize: 15)),
                         label: Text(
                           p.$2,
                           style: const TextStyle(
@@ -3137,8 +3146,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 ),
                 if (myBalance != null)
                   Text('Tu saldo: ${coinsText(myBalance)}',
-                      style: const TextStyle(
-                          fontSize: 14, color: Colors.white70)),
+                      style:
+                          const TextStyle(fontSize: 14, color: Colors.white70)),
                 const SizedBox(height: 6),
               ],
               if (sub.isNotEmpty)
@@ -3176,6 +3185,46 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         ),
         if (iWon && c.pot > 0) const Positioned.fill(child: CoinRain()),
       ],
+    );
+  }
+
+  /// Convierte SeatGeometry (de la nueva arquitectura) a SketchSeat
+  /// (del sistema antiguo) para mantener compatibilidad con _sketchRivalSeat.
+  SketchSeat _seatGeometryToSketchSeat(SeatGeometry seat) {
+    // Crear rects de SketchRect basados en las coordenadas de SeatGeometry
+    // Offset de barTop (56) para convertir a coordenadas relativas a pantalla
+    final barTop = 56.0;
+    
+    final avatar = SketchRect(
+      'avatar',
+      seat.avatarCenter.dx - seat.avatarSize.width / 2,
+      seat.avatarCenter.dy - seat.avatarSize.height / 2 + barTop,
+      seat.avatarSize.width,
+      seat.avatarSize.height,
+    );
+    
+    final cup = SketchRect(
+      'cup',
+      seat.cupCenter.dx - seat.cupSize.width / 2,
+      seat.cupCenter.dy - seat.cupSize.height / 2 + barTop,
+      seat.cupSize.width,
+      seat.cupSize.height,
+    );
+    
+    final plate = SketchRect(
+      'plate',
+      seat.plateCenter.dx - seat.plateSize.width / 2,
+      seat.plateCenter.dy - seat.plateSize.height / 2 + barTop,
+      seat.plateSize.width,
+      seat.plateSize.height,
+    );
+    
+    return SketchSeat(
+      seat.angleDeg,
+      avatar,
+      plate,
+      cup,
+      singleLinePlate: seat.singleLinePlate,
     );
   }
 }
