@@ -202,6 +202,7 @@ class MatchController extends ChangeNotifier {
   bool isHost = false;
   bool connected = true;
   bool gameStarted = false;
+  DateTime? gameStartTime;
 
   List<PlayerView> players = [];
   String phase = 'lobby';
@@ -470,6 +471,7 @@ class MatchController extends ChangeNotifier {
     final starter = _engine!.startGame();
     lastNotice = 'Sorteo: parte ${_engine!.playerById(starter).name}';
     gameStarted = true;
+    gameStartTime = DateTime.now();
     _syncLocal();
     notifyListeners();
     _scheduleLocal();
@@ -747,6 +749,7 @@ class MatchController extends ChangeNotifier {
         }).toList();
       case 'game_started':
         gameStarted = true;
+        gameStartTime = DateTime.now();
         phase = 'playing';
       case 'state':
         final s = m['state'] as Map<String, dynamic>;

@@ -17,6 +17,7 @@ import '../texts.dart';
 import '../theme.dart';
 import '../widgets/dice_and_cup.dart';
 import '../widgets/sketch_layout.dart';
+import '../widgets/mesa_bg_painter.dart';
 import '../widgets/panels.dart';
 import '../widgets/casino_anims.dart';
 import '../widgets/coin_widgets.dart';
@@ -819,12 +820,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         decoration: landscapeRoomDecoration(c.tableTheme),
         child: Stack(
           children: [
-            // Fondo 3D de la mesa según el tier/apuesta de la sala
+            // Fondo 3D de la mesa: pintor personalizado que no se
+            // distorsiona, mantiene aspecto perfecto sin problemas
+            // de alineación en desktop/mobile.
             Positioned.fill(
               child: RepaintBoundary(
-                child: Image.asset(
-                  _mesaFondoAsset(c.stake),
-                  fit: BoxFit.cover,
+                child: CustomPaint(
+                  painter: MesaBgPainter(theme: _themeForMesa(c.stake)),
                 ),
               ),
             ),
@@ -834,6 +836,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 child: DecoratedBox(decoration: roomVignette),
               ),
             ),
+
+
             // Tinte del tier en partida (11b): en partida el tier
             // manda sobre el selector de tema (P13 pendiente: el
             // selector sigue prometiendo fuera de partida un tema
@@ -1335,6 +1339,38 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       );
     }
 
+    /// Indicador de ronda con cronómetro en la barra superior.
+    /// Muestra: "R1 · Mansión · 00:45"
+    Widget roundInfo() {
+      if (!c.gameStarted || c.gameStartTime == null) {
+        return const SizedBox.shrink();
+      }
+
+      return StreamBuilder<int>(
+        stream: Stream.periodic(const Duration(seconds: 1), (i) => i),
+        builder: (context, snapshot) {
+          final elapsed = DateTime.now().difference(c.gameStartTime!);
+          final minutes = elapsed.inMinutes.toString().padLeft(2, '0');
+          final seconds = (elapsed.inSeconds % 60).toString().padLeft(2, '0');
+          final rnum = (c.round + 1).clamp(1, 3);
+          
+          // Extraer nombre de sala del roomCode o usar nombre por defecto
+          final roomName = c.roomCode != null 
+            ? c.roomCode!.split('-').first.toUpperCase()
+            : (c.guided ? 'GUIADA' : 'LOCAL');
+
+          return Text(
+            'R$rnum · $roomName · $minutes:$seconds',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: CachoColors.ivory,
+            ),
+          );
+        },
+      );
+    }
+
     /// Píldora de turno compacta para la fila angosta (la _turnPill
     /// de 18 px de padding lateral no cabe junto a pozo + apuesta
     /// a 390 px; mismo dato, mismo texto, padding lateral 10).
@@ -1611,6 +1647,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         exitPill(),
                         const SizedBox(width: 6),
                         balancePill(),
+                        const SizedBox(width: 6),
+                        roundInfo(),
                         Expanded(
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -1750,7 +1788,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                             ? turnPillCompact()
                             : Flexible(flex: 1, child: turnPillCompact())
                       else
-                        Flexible(child: roomInfo()),
+                        Flexible(child: roundInfo()),
                       if (cur != null) ...[
                         const SizedBox(width: 6),
                         Flexible(flex: myTurn ? 1 : 2, child: bidChipCompact()),
@@ -1809,34 +1847,35 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     );
   }
 
-  /// Imagen de fondo de la mesa según la apuesta (tier) de la partida.
-  /// Función pura: 100 La Taberna, 250 El Boliche, 500 El Casino
-  /// (mesa_fondo_mate.jpg, DEFINITIVA desde la ronda 2: la misma
-  /// foto que mesa_fondo.jpg con el paño aplanado a carbón mate,
-  /// ver F2), 1000 La Mansión, 2500 El Club VIP (nombres nuevos
-  /// docs/19 C7; montos y paños intactos); 0 (guiada) o cualquier
-  /// otro valor usa El Casino como defecto. Las variantes que no
-  /// son El Casino son PROPUESTAS pendientes del sí del usuario.
-  String _mesaFondoAsset(int stake) {
+
+
+
+  /// Mapeo de stakes a temas de mesa temáticos.
+  /// 100: Taberna (rústica, bohemia)
+  /// 250: Salón (billar clásico)
+  /// 500: Casino (profesional, carbón)
+  /// 1000: Mansión (elegante, dorado)
+  /// 2500: Highroller (lujo, púrpura/burdeos)
+  String _themeForMesa(int stake) {
     switch (stake) {
       case 100:
-        return 'assets/images/mesa_mockup_clean.jpg';
+        return 'taberna';
       case 250:
-        return 'assets/images/mesa_salon_3d.jpg';
+        return 'salon';
       case 500:
-        return 'assets/images/mesa_casino_3d.jpg';
+        return 'casino';
       case 1000:
-        return 'assets/images/mesa_vip_3d.jpg';
+        return 'mansion';
       case 2500:
-        return 'assets/images/mesa_highroller_3d.jpg';
+        return 'highroller';
       default:
-        return 'assets/images/mesa_mockup_clean.jpg';
+        return 'casino'; // Defecto
     }
   }
 
-  /// Mesa según mockup.jpeg: perspectiva 3D, madera caoba, apoyabrazos de cuero,
-  /// paño carbón con marca de agua "CACHO O DUDO", pozo arriba al centro con su vaso
-  /// y monto real, asientos y vasos distribuidos según sketch_layout (arreglo.md).
+  /// Mesa personalizada: fondo pintado dinámicamente (sin distorsión),
+            /// pozo arriba al centro con su vaso y monto real, asientos y vasos
+            /// distribuidos según sketch_layout (arreglo.md).
   Widget _sketchTable(List<PlayerView> others, double tableH, bool compact) {
     final screenW = MediaQuery.sizeOf(context).width;
     final layout = sketchLayout(
