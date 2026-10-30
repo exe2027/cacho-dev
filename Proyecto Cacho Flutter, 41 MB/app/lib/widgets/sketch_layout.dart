@@ -128,6 +128,7 @@ class SketchLayout {
   final double tableLeft;
   final double tableW;
   final double consoleH;
+  final bool compact;
   final SketchRect table;
   final SketchRect pot;
   final List<SketchSeat> seats;
@@ -143,6 +144,7 @@ class SketchLayout {
     required this.tableLeft,
     required this.tableW,
     required this.consoleH,
+    required this.compact,
     required this.table,
     required this.pot,
     required this.seats,
@@ -679,6 +681,7 @@ SketchLayout sketchLayout({
     tableLeft: tableLeft,
     tableW: tableW,
     consoleH: consoleH,
+    compact: compact,
     table: table,
     pot: pot,
     seats: seats,

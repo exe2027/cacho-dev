@@ -1846,6 +1846,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       myDiceCount: c.myHand.length,
       consoleH: 72,
     );
+    // Use layout.compact (unified source of truth) instead of the
+    // widget-layer compact parameter, which was calculated differently.
+    final layoutCompact = layout.compact;
 
     return Stack(
       clipBehavior: Clip.none,
@@ -1956,8 +1959,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         // Mi escenario (vaso + dados con hueco 104).
         Positioned(
           left: layout.myCup.cx - 165,
-          top: layout.myCup.top - 56 + (compact ? 52 : 76) - 140 + 7,
-          child: _myStageSketch(compact: compact),
+          top: layout.myCup.top - 56 + (layoutCompact ? 52 : 76) - 140 + 7,
+          child: _myStageSketch(compact: layoutCompact),
         ),
         // Mi asiento (RONDA 2, F4): placa CENTRADA BAJO mi avatar
         // (antes en fila a su derecha, descentrada). El widget

@@ -169,4 +169,35 @@ void main() {
       }
     }
   });
+
+  test('caso intermedio: unificación compact (screenH < 390)', () {
+    // El desacuerdo ocurría: widget calculaba compact = (totalH < 390),
+    // pero layout calculaba compact = (tableH < 262).
+    // Con layout screenH = barra + tableH + consola = 56 + tableH + 72:
+    // a screenH=390 → tableH=262 (no < 262: compact=false).
+    // a screenH<390 → tableH<262 (compact=true en ambas capas).
+    // Test verifica que layout.compact y el cálculo del widget concuerdan.
+    for (final screenH in [389.0, 350.0, 340.0]) {
+      final consoleH = 72.0;
+      final tableH = screenH - 56.0 - consoleH;
+      final expectedCompact = tableH < 262;
+
+      final l = sketchLayout(
+        screenW: 844,
+        screenH: screenH,
+        rivals: 3,
+        myDiceCount: 5,
+        consoleH: consoleH,
+      );
+
+      // Verificar que tableH real es cercano al esperado.
+      expect(l.tableH, closeTo(tableH, 1.0),
+          reason: 'screenH=$screenH: tableH=${l.tableH} vs esperado $tableH');
+
+      // layout.compact debe coincidir con la regla: tableH < 262
+      expect(l.compact, expectedCompact,
+          reason: 'screenH=$screenH: tableH=${l.tableH} → compact debe ser '
+              '$expectedCompact pero es ${l.compact}');
+    }
+  });
 }
