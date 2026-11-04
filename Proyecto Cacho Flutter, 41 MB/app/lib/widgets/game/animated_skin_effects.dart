@@ -484,3 +484,4 @@ class AnimatedFramePainter extends CustomPainter {
   bool shouldRepaint(covariant AnimatedFramePainter oldDelegate) =>
       oldDelegate.animationValue != animationValue || oldDelegate.frame.id != frame.id;
 }
+
