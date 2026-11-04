@@ -35,3 +35,8 @@ toolchain/
 .DS_Store
 Thumbs.db
 audit/**/*.png
+.wrangler/
+scratch/
+.agents/
+skills-lock.json
+**/nul

@@ -51,9 +51,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          maxLength: 16,
+          maxLength: 12,
+          inputFormatters: [
+            FilteringTextInputFormatter.deny(RegExp(r'\s')),
+          ],
           textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(hintText: 'Tu nombre'),
+          decoration: const InputDecoration(hintText: 'Tu nombre (1 palabra, máx 12)'),
           onSubmitted: (v) => Navigator.of(dctx).pop(v),
         ),
         actions: [
@@ -68,10 +71,14 @@ class _LobbyScreenState extends State<LobbyScreen> {
         ],
       ),
     );
-    if (name != null && name.trim().isNotEmpty) c.renameMe(name);
+    if (name != null && name.trim().isNotEmpty) {
+      final word = name.trim().split(RegExp(r'\s+')).first;
+      final clean = word.length > 12 ? word.substring(0, 12) : word;
+      c.renameMe(clean);
+    }
   }
 
-  int _fillBots = 0;
+  int _fillBots = 5;
   String _botDifficulty = 'media';
   bool _navigated = false;
   String? _shownError;

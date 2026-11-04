@@ -1,3 +1,4 @@
+import '../state/yt_player.dart';
 import 'dart:async';
 import 'dart:math';
 
@@ -23,6 +24,11 @@ import '../widgets/casino_anims.dart';
 import '../widgets/coin_widgets.dart';
 import '../widgets/music_sheet.dart';
 import '../widgets/yt_host.dart';
+import '../config/room_configs.dart';
+import '../widgets/game/table_2d_layout_widget.dart';
+import '../widgets/game/premium_table_widget.dart';
+import '../widgets/game/player_slot_widget.dart';
+import '../widgets/game/game_hud_widget.dart';
 import '../state/wallet.dart';
 import 'how_to_play_screen.dart';
 
@@ -40,12 +46,14 @@ class GameScreen extends StatefulWidget {
   final bool curtainEntry;
   // AN16: vaso que se posa (false al reincorporarse a partida en curso).
   final bool cupEntry;
+  final RoomConfig? roomConfig;
   const GameScreen({
     super.key,
     required this.controller,
     required this.leather,
     this.curtainEntry = false,
     this.cupEntry = true,
+    this.roomConfig,
   });
 
   @override
@@ -126,10 +134,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   MatchController get c => widget.controller;
   Settings get _s => Settings.instance;
+  late RoomConfig _roomConfig;
 
   @override
   void initState() {
     super.initState();
+    _roomConfig = widget.roomConfig ?? getRoomConfigByStake(widget.controller.stake);
     WakelockPlus.enable();
     _shakeCtrl = AnimationController(
       vsync: this,
@@ -198,6 +208,16 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     appViewport.removeListener(_onViewport);
     appViewport.stopWatching();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant GameScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.roomConfig != null) {
+      _roomConfig = widget.roomConfig!;
+    } else if (widget.controller.stake != oldWidget.controller.stake) {
+      _roomConfig = getRoomConfigByStake(widget.controller.stake);
+    }
   }
 
   // ---------- Secuencia 3D del vaso ----------
@@ -348,6 +368,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     _lastBidKey = bidKey;
     // Fin de partida: fanfarria si gané yo.
     if (c.phase == 'finished' && _prevPhase != 'finished') {
+      if (c.guided) {
+        _s.markGuidedDone();
+      }
       if (c.winnerId == c.myId) {
         AudioService.instance.winFanfare();
         if (c.pot > 0 && !c.isDraw) AudioService.instance.coins();
@@ -423,26 +446,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         _heldNotice = notice;
         c.lastNotice = null;
       } else {
-        _shownNotice = notice;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            ScaffoldMessenger.of(context)
-                .showSnackBar(SnackBar(content: Text(notice)));
-          }
-          c.lastNotice = null;
-          _shownNotice = null;
-        });
+        _showCenterNotice(notice);
+        c.lastNotice = null;
       }
     }
     if (c.uiResolution == null && _heldNotice != null) {
       final held = _heldNotice!;
       _heldNotice = null;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(held)));
-        }
-      });
+      _showCenterNotice(held);
     }
     // Reacción nueva: se retira sola a los ~2,2 s. Si llega otra
     // antes, el temporizador anterior se cancela y manda la nueva
@@ -460,20 +471,112 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     final err = c.errorMessage;
     if (err != null && err != _shownError) {
       _shownError = err;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(err)));
-        }
-        c.clearError();
-        _shownError = null;
-      });
+      _showCenterNotice(err, isError: true);
+      c.clearError();
+      _shownError = null;
     }
     setState(() {});
   }
 
+  String? _centerNotice;
+  bool _centerNoticeIsError = false;
+  Timer? _centerNoticeTimer;
+
+  void _showCenterNotice(String text, {bool isError = false}) {
+    if (!mounted) return;
+    _centerNoticeTimer?.cancel();
+    setState(() {
+      _centerNotice = text;
+      _centerNoticeIsError = isError;
+    });
+    _centerNoticeTimer = Timer(const Duration(milliseconds: 1900), () {
+      if (mounted) setState(() => _centerNotice = null);
+    });
+  }
+
+  Widget _buildCenterNoticeWidget() {
+    if (_centerNotice == null) return const SizedBox.shrink();
+    final isErr = _centerNoticeIsError;
+    return Positioned.fill(
+      child: IgnorePointer(
+      child: Center(
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: const Duration(milliseconds: 250),
+          builder: (_, val, child) => Opacity(
+            opacity: val,
+            child: Transform.scale(
+              scale: 0.85 + 0.15 * val,
+              child: child,
+            ),
+          ),
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xF20F172A),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: isErr ? const Color(0xFFEF4444) : CachoColors.gold,
+                width: 1.6,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: (isErr ? const Color(0x66EF4444) : const Color(0x66D4AF37)),
+                  blurRadius: 18,
+                  spreadRadius: 2,
+                ),
+                const BoxShadow(
+                  color: Colors.black87,
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isErr ? Icons.error_outline : Icons.notifications_active_outlined,
+                  color: isErr ? const Color(0xFFEF4444) : CachoColors.gold,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    _centerNotice!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      shadows: [
+                        Shadow(color: Colors.black, blurRadius: 4),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      ),
+    );
+  }
+
   void _exit() {
-    c.dispose();
+    c.pauseMusic();
+    YtPlayer.stopAll();
+    AudioService.djTakeover = false;
+    AudioService.instance.stopMusic();
+    if (!c.isGameOver) {
+      c.pauseTimers();
+      MatchController.activeSession = c;
+    } else {
+      c.dispose();
+      MatchController.activeSession = null;
+    }
     Navigator.of(context).popUntil((r) => r.isFirst);
   }
 
@@ -792,327 +895,324 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   Widget _buildLandscape(BuildContext context, List<PlayerView> others) {
     final kamikaze = c.phase == 'kamikazeOffer' || c.phase == 'kamikazeChoice';
-    // R44: SafeArea real = máx(MediaQuery, puente JS). En web de
-    // Safari el puente cubre el caso SafeArea = 0.
-    final mq = MediaQuery.of(context);
-    final safeTop = mq.padding.top > appViewport.safeTop
-        ? mq.padding.top
-        : appViewport.safeTop;
-    final safeBottom = mq.padding.bottom > appViewport.safeBottom
-        ? mq.padding.bottom
-        : appViewport.safeBottom;
-    final totalH = mq.size.height - safeTop - safeBottom;
-    final compact = totalH < 390;
     final pasoPendingForMe =
         c.pendingPasoId != null && c.pendingPasoId != c.myId && c.isMyTurn;
-    // Chip de probabilidad (F4): solo con ayuda de principiante,
-    // armada legal y NO Kamikaze a ciegas.
-    final blind = kamikaze;
-    final probLegal = _consoleArmed != null &&
-        GameEngine.raiseError(c.currentBid, _consoleArmed!, c.totalDice,
-                acesRuleEnabled: c.uiConfig.acesRuleEnabled) ==
-            null;
-    final showProb = _landscapeConsoleOpen &&
-        Settings.instance.beginnerHelp &&
-        probLegal &&
-        !blind;
-    final tier = c.stake > 0 ? tierLookFor(c.stake) : null;
+
+    final roomConfig = widget.roomConfig ?? _roomConfig;
+    final slotsData = _buildTableSlotsData(others, roomConfig);
+
     return Scaffold(
-      body: DecoratedBox(
-        decoration: landscapeRoomDecoration(c.tableTheme),
-        child: Stack(
-          children: [
-            // Recuperar la fotografía temática; un gradiente plano no
-            // representa la mesa ni da referencia visual a los asientos.
+      backgroundColor: const Color(0xFF0D0906),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // =========================================================
+          // CAPA 1 y 2: PremiumTableWidget (Mesa 2.5D Casino + Slots Encajados)
+          // =========================================================
+          Positioned.fill(
+            child: PremiumTableWidget(
+              roomConfig: roomConfig,
+              slots: slotsData,
+              pot: c.displayPot,
+              currentBid: c.currentBid,
+              lastBidderName: c.currentBid != null && c.lastBidderId != null
+                  ? nameOf(c, c.lastBidderId)
+                  : null,
+            ),
+          ),
+
+          // =========================================================
+          // CAPA 2.5: Notificaciones y Anuncios Rápidos al Medio de la Mesa
+          // =========================================================
+          _buildCenterNoticeWidget(),
+
+          // =========================================================
+          // CAPA 3: GameHUDWidget (SafeArea Overlay: Top Bar & Bottom Dock)
+          // =========================================================
+          Positioned.fill(
+            child: SafeArea(
+              child: GameHUDWidget(
+                roomConfig: roomConfig,
+                pot: c.displayPot,
+                goldCoins: (c.online ? c.serverBalance : Wallet.instance.balance) ?? 0,
+                cash: 0,
+                isAudioMuted: !AudioService.instance.enabled,
+                onToggleAudio: () {
+                  setState(() => AudioService.instance.enabled = !AudioService.instance.enabled);
+                  AudioService.instance.syncAmbience();
+                },
+                onOpenMusic: () => showMusicSheet(context, c),
+                onExit: _exit,
+                roomSubtitle:
+                    '${c.roomCode != null ? 'SALA ${c.roomCode}' : (c.guided ? 'GUIADA' : 'LOCAL')} · R${c.round} · ${c.totalDice} dados',
+                isMyTurn: c.isMyTurn,
+                activeTurnName: c.actorId != null ? nameOf(c, c.actorId) : null,
+                currentBid: c.currentBid,
+                bidderName: c.currentBid != null && c.lastBidderId != null
+                    ? nameOf(c, c.lastBidderId)
+                    : null,
+                armedBid: _consoleArmed,
+                isBidLegal: _isBidLegal(_consoleArmed),
+                bidError: _getBidError(_consoleArmed),
+                onSelectFace: _handleSelectFace,
+                onAdjustQuantity: _handleAdjustQuantity,
+                onPlaceBid: _handlePlaceBid,
+                canCalzo: c.canCalzoUi,
+                onCalzo: c.canCalzoUi ? _handleCalzo : null,
+                canDudo: c.isMyTurn && c.currentBid != null,
+                onDudo: (c.isMyTurn && c.currentBid != null) ? _handleDudo : null,
+                canPaso: c.canPasoUi,
+                onPaso: c.canPasoUi ? _handlePaso : null,
+                isCupOpen: _open,
+                onToggleCup: () => setState(_toggleEye),
+                bannerNotification: kamikaze
+                    ? KamikazeBar(controller: c)
+                    : (pasoPendingForMe ? PasoChallengeBar(controller: c) : null),
+              ),
+            ),
+          ),
+
+          // Botón flotante de Chat / Emotes
+          if (c.phase == 'playing' && c.uiResolution == null && !kamikaze)
+            Positioned(
+              left: 14,
+              bottom: 74,
+              child: _buildChatFloatingButton(context, roomConfig),
+            ),
+
+          // Overlays de resolución y fin de partida
+          if (c.uiResolution != null)
             Positioned.fill(
-              child: RepaintBoundary(
-                child: Image.asset(
-                  _mesaFondoAsset(c.stake),
-                  fit: BoxFit.cover,
+              child: SafeArea(
+                child: ResolutionOverlay(
+                  key: ValueKey(c.resolutionSeq),
+                  controller: c,
+                  compact: true,
                 ),
               ),
             ),
-            // Viñeta de la sala sobre la foto, debajo del contenido.
+          if (c.phase == 'finished' && c.uiResolution == null)
+            _winnerOverlay(),
+
+          // AN6: cortina de apertura al entrar desde el lobby
+          if (_showEntryCurtain)
             Positioned.fill(
-              child: IgnorePointer(
-                child: DecoratedBox(decoration: roomVignette),
+              child: EntryCurtain(
+                opening: true,
+                onDone: () {
+                  if (mounted) {
+                    setState(() => _showEntryCurtain = false);
+                  }
+                },
               ),
             ),
 
-            // Tinte del tier en partida (11b): en partida el tier
-            // manda sobre el selector de tema (P13 pendiente: el
-            // selector sigue prometiendo fuera de partida un tema
-            // que la partida con tier no respetará).
-            if (tier != null && tier.roomTint.alpha > 0)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                      decoration: BoxDecoration(color: tier.roomTint)),
-                ),
-              ),
-            Padding(
-              padding: EdgeInsets.only(top: safeTop, bottom: safeBottom),
-              child: Stack(
-                children: [
-                  Column(
-                    children: [
-                      _sketchTopBar(),
-                      // Filas transitorias bajo la barra, en orden
-                      // fijo (propuesto A4, P17 pendiente de fijar):
-                      // KamikazeBar / PasoChallengeBar. Nunca
-                      // overlays sobre tiles o botones. Kamikaze
-                      // nunca coincide con consola/panel/paso
-                      // (fases excluyentes). El panel "Tu apuesta"
-                      // ya NO va aquí (ÁREA 9): va abajo, justo
-                      // encima de la consola.
-                      if (kamikaze) KamikazeBar(controller: c),
-                      if (pasoPendingForMe) PasoChallengeBar(controller: c),
-                      if (showProb)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          child: ProbChip(prob: c.estimateFor(_consoleArmed!)),
-                        ),
-                      // NOTA ÁREA 9: el panel "Tu apuesta" ya NO vive
-                      // aquí (entre la barra y la mesa): bajó a la
-                      // fila justo encima de la consola, después de
-                      // la mesa, antes de BottomBidBar / FoldedBar.
-                      Expanded(
-                        child: LayoutBuilder(
-                          builder: (_, box) {
-                            final tableH = box.maxHeight;
-                            return RepaintBoundary(
-                              child: _sketchTable(others, tableH, compact),
-                            );
-                          },
-                        ),
-                      ),
-                      // Tira VER + reacciones (paridad V1/C9): fila
-                      // propia de 44 px JUSTO ENCIMA de la consola
-                      // (o del borde inferior sin consola), nunca
-                      // overlay sobre la mesa: la mesa se achica
-                      // 44 px en vez de quedar tapada. Solo en
-                      // partida, sin resolución y FUERA de la
-                      // ceguera Kamikaze (ahí no hay VER). VER es
-                      // el único mecanismo de revelación en
-                      // horizontal; el toque en el vaso y el
-                      // long-press ya no revelan.
-                      if (c.phase == 'playing' &&
-                          c.uiResolution == null &&
-                          !kamikaze)
-                        // CORRECCIÓN 26-oct (zonas VER/toggle, §3c
-                        // del informe): el toggle dorado "Tu
-                        // apuesta" (44×44 en x 8..52, a caballo
-                        // sobre el borde superior de la consola)
-                        // tapaba la mitad izquierda de VER. Con la
-                        // consola ABIERTA la tira lleva padding
-                        // izquierdo 56 y VER queda en x 64..~146
-                        // (12 px libres al toggle, ningún píxel
-                        // bajo él). Con el panel desplegado la
-                        // fila sobre la consola es el panel, que
-                        // ya deja 56 px libres. Con la consola
-                        // plegada/cerrada el toggle no se pinta y
-                        // VER vuelve a x 8.
-                        Padding(
-                          padding: EdgeInsets.only(
-                              left: _landscapeConsoleOpen ? 56 : 0),
-                          child: VerEmoteStrip(
-                            controller: c,
-                            verOpen: _open,
-                            onVerTap: () => setState(_toggleEye),
-                          ),
-                        ),
-                      // ÁREA 9 — panel "Tu apuesta" JUSTO ENCIMA de
-                      // la consola (hermana de PasoChallengeBar, fila
-                      // propia, nunca overlay): vive en este mismo
-                      // segmento de la Column, después de la mesa
-                      // (Expanded) y antes de ambas ramas de consola
-                      // (FoldedActionBar / BottomBidBar). Lee la
-                      // ÚNICA armada _consoleArmed, la misma que
-                      // alimenta a BottomBidBar abajo (onArmedChanged
-                      // la actualiza); plegar/desplegar NO la toca.
-                      // El padding izquierdo (56) deja libre el hueco
-                      // del toggle dorado 44×44 (left 8 + 44 = 52),
-                      // que sobresale por arriba de la consola y
-                      // ahora caería sobre la fila del panel.
-                      if (_landscapeConsoleOpen && _tuApuestaExpanded)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 56),
-                          child: TuApuestaStrip(
-                              controller: c, armed: _consoleArmed),
-                        ),
-                      if (_landscapeFoldedBarVisible)
-                        FoldedActionBar(
-                          controller: c,
-                          armed: _consoleArmed,
-                          onUnfold: () => setState(() {
-                            _sideFolded = false;
-                          }),
-                        )
-                      else if (_landscapeConsoleOpen)
-                        Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            BottomBidBar(
-                              controller: c,
-                              armed: _consoleArmed,
-                              compact: compact,
-                              onArmedChanged: (b) => setState(() {
-                                _consoleArmed = b;
-                                _consoleArmedFace = b?.face;
-                              }),
-                              onFold: () => setState(() {
-                                _sideFolded = true;
-                                // Plegado por defecto: al cerrar la
-                                // consola el panel también se pliega
-                                // (NO se borra la armada, solo el
-                                // despliegue; al reabrir en el mismo
-                                // turno no reaparece expandido).
-                                _tuApuestaExpanded = false;
-                              }),
-                            ),
-                            // Pestaña toggle "Tu apuesta" (F4):
-                            // 44×44 SOBRE la consola (ronda 4: ya
-                            // no a caballo sobre su borde; ver
-                            // abajo), sobre la fila VER, cuya zona
-                            // x 8..52 está vacía por el padding 56.
-                            // Un toque despliega y otro pliega,
-                            // sin mantener presionado; no borra ni
-                            // resetea la armada.
-                            // RONDA 4 (círculo/tile 1): top −50
-                            // (era −22): el círculo 44×44 queda
-                            // ENTERO sobre la fila VER (44 px,
-                            // con padding izquierdo 56 cuando la
-                            // consola está abierta, así que la
-                            // zona x 8..52 de esa fila está
-                            // vacía) y con 6 px de aire sobre el
-                            // borde superior de la consola, en
-                            // vez de montar 18 px sobre el tile 1
-                            // (solape ~40 % de su cara en
-                            // consola.png ronda 3). 0 % de solape
-                            // medido en captura ronda 4.
-                            Positioned(
-                              left: 8,
-                              top: -50,
-                              child: Material(
-                                color: CachoColors.gold,
-                                shape: const CircleBorder(),
-                                elevation: 4,
-                                child: InkWell(
-                                  customBorder: const CircleBorder(),
-                                  onTap: () => setState(() {
-                                    _tuApuestaExpanded = !_tuApuestaExpanded;
-                                  }),
-                                  child: const SizedBox(
-                                    width: 44,
-                                    height: 44,
-                                    child: Icon(Icons.casino,
-                                        size: 22, color: Color(0xFF2B1810)),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                  // P1 (integración corrección 09:35): música nativa en
-                  // horizontal. Sin esto, NativeYtHost solo vivía en la
-                  // rama vertical y al girar se desmontaba el WebView
-                  // (MusicService._tick retornaba antes de cargar).
-                  if (c.online && !kIsWeb)
-                    const Positioned(
-                      left: 0,
-                      bottom: 0,
-                      child: NativeYtHost(),
-                    ),
-                  // RONDA 2 (F5/F8): la revelación empieza DEBAJO
-                  // de la barra superior (top 56): la barra queda
-                  // nítida durante la resolución (antes el overlay
-                  // negro 0,96 la dejaba como cabecera fantasma
-                  // y el pozo de la barra casi ilegible) y el pozo
-                  // real sigue legible arriba mientras se cuenta
-                  // y se dicta el veredicto. La rejilla 2×3 no
-                  // cambia (F11: se mantiene).
-                  if (c.uiResolution != null)
-                    Positioned(
-                      top: _sketchBarH,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      // RONDA 2 corrección 2 (F11): compacto, o la
-                      // 3ª fila + Seguir quedan cortados (el marco
-                      // es 334, no 390; ver revealContentHeight).
-                      child: ResolutionOverlay(
-                        key: ValueKey(c.resolutionSeq),
-                        controller: c,
-                        compact: compact,
-                      ),
-                    ),
-                  if (c.phase == 'finished' && c.uiResolution == null)
-                    _winnerOverlay(),
-                  // Botón flotante de Chat / Emotes (mockup.jpeg)
-                  if (c.phase == 'playing' &&
-                      c.uiResolution == null &&
-                      !kamikaze)
-                    Positioned(
-                      left: 12,
-                      bottom: _landscapeConsoleOpen ? 66 : 12,
-                      child: Material(
-                        color: const Color(0xFF162544).withValues(alpha: 0.92),
-                        shape: const CircleBorder(),
-                        elevation: 6,
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: () => _showQuickChatSheet(context),
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: CachoColors.gold.withValues(alpha: 0.75),
-                                width: 1.5,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.5),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.chat_bubble_rounded,
-                                size: 20,
-                                color: CachoColors.ivory,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  // AN6: cortina de apertura al entrar desde el lobby.
-                  if (_showEntryCurtain)
-                    Positioned.fill(
-                      child: EntryCurtain(
-                        opening: true,
-                        onDone: () {
-                          if (mounted) {
-                            setState(() => _showEntryCurtain = false);
-                          }
-                        },
-                      ),
-                    ),
-                ],
-              ),
+          // P1: Música nativa en segundo plano
+          if (c.online && !kIsWeb)
+            const Positioned(
+              left: 0,
+              bottom: 0,
+              child: NativeYtHost(),
             ),
-          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChatFloatingButton(
+      BuildContext context, RoomConfig roomConfig) {
+    return Material(
+      color: const Color(0xFF162544).withValues(alpha: 0.92),
+      shape: const CircleBorder(),
+      elevation: 6,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () => _showQuickChatSheet(context),
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: roomConfig.accentColor.withValues(alpha: 0.8),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.5),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: const Center(
+            child: Icon(
+              Icons.chat_bubble_rounded,
+              size: 18,
+              color: CachoColors.ivory,
+            ),
+          ),
         ),
       ),
     );
   }
+
+  bool _isBidLegal(Bid? b) {
+    if (b == null) return false;
+    return GameEngine.raiseError(c.currentBid, b, c.totalDice,
+            acesRuleEnabled: c.uiConfig.acesRuleEnabled) ==
+        null;
+  }
+
+  String? _getBidError(Bid? b) {
+    if (b == null) return null;
+    return GameEngine.raiseError(c.currentBid, b, c.totalDice,
+        acesRuleEnabled: c.uiConfig.acesRuleEnabled);
+  }
+
+  void _handleSelectFace(int face) {
+    setState(() {
+      final cur = _consoleArmed;
+      if (cur != null && cur.face == face) {
+        if (cur.quantity >= c.totalDice) {
+          HapticFeedback.heavyImpact();
+        } else {
+          HapticFeedback.lightImpact();
+          _consoleArmed = Bid(cur.quantity + 1, face);
+        }
+      } else {
+        HapticFeedback.lightImpact();
+        final minQty = _calculateMinQuantityForFace(face);
+        _consoleArmed = Bid(minQty, face);
+      }
+    });
+  }
+
+  int _calculateMinQuantityForFace(int face) {
+    final cur = c.currentBid;
+    if (cur == null) return 1;
+    for (int q = 1; q <= c.totalDice; q++) {
+      final candidate = Bid(q, face);
+      if (GameEngine.raiseError(cur, candidate, c.totalDice,
+              acesRuleEnabled: c.uiConfig.acesRuleEnabled) ==
+          null) {
+        return q;
+      }
+    }
+    return cur.quantity;
+  }
+
+  void _handleAdjustQuantity(int newQty) {
+    if (_consoleArmed == null) return;
+    if (newQty < 1 || newQty > c.totalDice) return;
+    setState(() {
+      _consoleArmed = Bid(newQty, _consoleArmed!.face);
+    });
+  }
+
+  void _handlePlaceBid() {
+    if (_consoleArmed == null || !_isBidLegal(_consoleArmed)) return;
+    c.doBid(_consoleArmed!);
+    setState(() {
+      _consoleArmed = null;
+    });
+  }
+
+  void _handleCalzo() {
+    if (c.pendingPasoId != null) {
+      c.doCalzoPaso();
+    } else {
+      c.doCalzo();
+    }
+  }
+
+  void _handleDudo() {
+    if (c.pendingPasoId != null) {
+      c.doDudoPaso();
+    } else {
+      c.doDudo();
+    }
+  }
+
+  void _handlePaso() {
+    c.doPaso();
+  }
+
+  List<PlayerSlotData> _buildTableSlotsData(
+      List<PlayerView> others, RoomConfig roomConfig) {
+    final List<PlayerSlotData> list = [];
+
+    // Slot 0: Usuario local (Abajo Centro - 0.50, 0.82)
+    final myLast = c.lastActionBy[c.myId];
+    list.add(
+      PlayerSlotData(
+        targetSlotIndex: 0,
+        id: c.myId,
+        name: c.myNickname.isNotEmpty ? c.myNickname : 'Tú',
+        diceCount: c.myHand.length,
+        coins: (c.online ? c.serverBalance : Wallet.instance.balance) ?? 0,
+        isLocalUser: true,
+        isTurn: c.isMyTurn,
+        isEliminated: c.myHand.isEmpty,
+        turnProgress: _ringFractionFor(c.myId),
+        dice: c.myHand,
+        isCupOpen: _open,
+        isRevealed: false,
+        lastAction: myLast != null ? eventLabel(myLast) : null,
+        roomConfig: roomConfig,
+        onTapCup: () => setState(_toggleEye),
+        activeEmote: c.emotePlayerId == c.myId ? c.emoteGlyph : null,
+      ),
+    );
+
+    // Asignación simétrica para los asientos de rivales (1..5)
+    final count = others.length;
+    final List<int> targetSlots;
+    if (count == 1) {
+      targetSlots = [3]; // Arriba Centro
+    } else if (count == 2) {
+      targetSlots = [2, 4]; // Arriba Izq, Arriba Der
+    } else if (count == 3) {
+      targetSlots = [1, 3, 5]; // Abajo Izq, Arriba Centro, Abajo Der
+    } else if (count == 4) {
+      targetSlots = [1, 2, 4, 5];
+    } else {
+      targetSlots = [1, 2, 3, 4, 5];
+    }
+
+    for (int i = 0; i < others.length && i < targetSlots.length; i++) {
+      final p = others[i];
+      final isTurn = c.actorId == p.id;
+      final isElim = p.diceCount <= 0;
+      final isRevealed = c.phase == 'resolution' || c.uiResolution != null;
+      final revealedHand = const <int>[];
+      final lastAction = c.lastActionBy[p.id];
+
+      list.add(
+        PlayerSlotData(
+          targetSlotIndex: targetSlots[i],
+          id: p.id,
+          name: p.nickname,
+          diceCount: p.diceCount,
+          coins: 0,
+          isLocalUser: false,
+          isTurn: isTurn,
+          isEliminated: isElim,
+          turnProgress: isTurn ? _ringFractionFor(p.id) : null,
+          dice: revealedHand,
+          isCupOpen: false,
+          isRevealed: isRevealed,
+          lastAction: lastAction != null ? eventLabel(lastAction) : null,
+          roomConfig: roomConfig,
+          onTapCup: null,
+          activeEmote: c.emotePlayerId == p.id ? c.emoteGlyph : null,
+        ),
+      );
+    }
+
+    return list;
+  }
+
 
   /// Barra superior bosquejo de 56 px (sentencia F5): SOLO lo
   /// existente (Salir, saldo, píldora de turno + apuesta vigente,
@@ -1507,17 +1607,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 c.toggleMic();
               } else {
                 setState(() => _localMicOn = !_localMicOn);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      _localMicOn
-                          ? 'Micrófono activado (modo local/prueba).'
-                          : 'Micrófono silenciado.',
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                    duration: const Duration(milliseconds: 1400),
-                  ),
-                );
+                _showCenterNotice(_localMicOn ? 'Micrófono activado' : 'Micrófono silenciado');
               }
             },
             child: Tooltip(
@@ -2567,16 +2657,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                           color: CachoColors.gold.withValues(alpha: 0.3),
                         ),
                         onPressed: () {
-                          c.sendEmote(p.$1);
+                          c.sendQuickChat('${p.$1} ${p.$2}');
                           Navigator.of(sheetCtx).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Dijiste: "${p.$2}"',
-                                  style: const TextStyle(fontSize: 14)),
-                              duration: const Duration(seconds: 2),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
                         },
                       ),
                   ],
@@ -3077,17 +3159,24 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   Widget _winnerOverlay() {
+    if (c.guided) {
+      _s.markGuidedDone();
+    }
     final iWon = !c.isDraw && c.winnerId == c.myId;
-    final title = c.isDraw
-        ? '¡EMPATE!'
-        : (iWon ? '¡GANASTE!' : 'GANÓ ${nameOf(c, c.winnerId)}');
-    final sub = c.isDraw
-        ? (c.stake > 0
-            ? 'Se te devolvió tu apuesta de ${coinsText(c.stake)}.'
-            : 'Sin ganador.')
-        : (c.pot > 0 && !iWon
-            ? '${shortNameOf(c, c.winnerId)} se llevó el pozo de ${coinsText(c.pot)}.'
-            : '');
+    final title = c.guided
+        ? '¡TUTORIAL COMPLETADO!'
+        : (c.isDraw
+            ? '¡EMPATE!'
+            : (iWon ? '¡GANASTE!' : 'GANÓ ${nameOf(c, c.winnerId)}'));
+    final sub = c.guided
+        ? '¡Excelente! Ya conoces la dinámica del Cacho y estás listo para jugar en las salas reales.'
+        : (c.isDraw
+            ? (c.stake > 0
+                ? 'Se te devolvió tu apuesta de ${coinsText(c.stake)}.'
+                : 'Sin ganador.')
+            : (c.pot > 0 && !iWon
+                ? '${shortNameOf(c, c.winnerId)} se llevó el pozo de ${coinsText(c.pot)}.'
+                : ''));
     final myBalance = c.online ? c.serverBalance : Wallet.instance.balance;
     final iEliminated = !iWon && !c.isDraw && (c.me?.eliminated ?? false);
     return Stack(
@@ -3156,7 +3245,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               BronzeButton(label: 'VOLVER AL INICIO', onPressed: _exit),
               // B4 (sentencia v2.0): revancha SOLO en local, en un
               // toque: misma mesa, bots, dificultad, apuesta y mesa.
-              if (!c.online) ...[
+              if (!c.online && !c.guided) ...[
                 const SizedBox(height: 12),
                 BronzeButton(
                   label: 'OTRA VEZ',

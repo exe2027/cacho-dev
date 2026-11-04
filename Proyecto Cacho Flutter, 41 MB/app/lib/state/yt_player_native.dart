@@ -17,6 +17,12 @@ class YtPlayer {
   /// la busca aquí para montar el WebView con su controlador.
   static YtPlayer? instance;
 
+  static void stopAll() {
+    try {
+      instance?.pause();
+    } catch (_) {}
+  }
+
   YtPlayer() {
     instance = this;
   }
@@ -101,6 +107,9 @@ class YtPlayer {
   }
 
   void dispose() {
+    try {
+      _ctrl?.pauseVideo();
+    } catch (_) {}
     _posSub?.cancel();
     _stateSub?.cancel();
     if (instance == this) instance = null;

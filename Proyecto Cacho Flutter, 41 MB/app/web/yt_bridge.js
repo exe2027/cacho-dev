@@ -71,6 +71,7 @@ window.CachoYt = (function () {
     },
     play: function () { if (ready && player) player.playVideo(); },
     pause: function () { if (ready && player) player.pauseVideo(); },
+    stop: function () { if (ready && player) { try { player.pauseVideo(); player.stopVideo(); } catch(e){} } },
     seekTo: function (sec) {
       if (ready && player) player.seekTo(sec, true);
     },

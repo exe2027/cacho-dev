@@ -490,22 +490,116 @@ class FloatingEmote extends StatelessWidget {
   Widget build(BuildContext context) {
     final animOn = Settings.instance.animationsEnabled &&
         !MediaQuery.disableAnimationsOf(context);
-    final label = Text(glyph,
-        style: const TextStyle(fontSize: 32, shadows: [
-          Shadow(color: Colors.black, blurRadius: 6),
-          Shadow(color: Colors.black87, blurRadius: 12),
-        ]));
-    if (!animOn) return label;
+
+    final isSingleEmoji = glyph.runes.length <= 2 && !glyph.contains(' ');
+
+    final bubble = Material(
+      color: Colors.transparent,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            constraints: const BoxConstraints(maxWidth: 220, minWidth: 36),
+            padding: EdgeInsets.symmetric(
+              horizontal: isSingleEmoji ? 10 : 12,
+              vertical: isSingleEmoji ? 5 : 6,
+            ),
+            decoration: BoxDecoration(
+              color: const Color(0xF2121C2C),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: CachoColors.gold,
+                width: 1.5,
+              ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black87,
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
+                ),
+                BoxShadow(
+                  color: Color(0x33D4AF37),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: Text(
+              glyph,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: isSingleEmoji ? 24 : 13.5,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                shadows: const [
+                  Shadow(color: Colors.black, blurRadius: 4),
+                ],
+              ),
+            ),
+          ),
+          CustomPaint(
+            size: const Size(12, 6),
+            painter: _BubbleTailPainter(
+              color: const Color(0xF2121C2C),
+              borderColor: CachoColors.gold,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (!animOn) return bubble;
+
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 1800),
-      builder: (_, t, child) => Opacity(
-        opacity: (t < 0.7 ? 1.0 : (1.0 - (t - 0.7) / 0.3)).clamp(0.0, 1.0),
-        child: Transform.translate(offset: Offset(0, -28 * t), child: child),
-      ),
-      child: label,
+      duration: const Duration(milliseconds: 2400),
+      builder: (_, t, child) {
+        final scale = (t < 0.15 ? (0.6 + 0.4 * (t / 0.15)) : 1.0).clamp(0.0, 1.1);
+        final opacity = (t < 0.75 ? 1.0 : (1.0 - (t - 0.75) / 0.25)).clamp(0.0, 1.0);
+        final translateY = -8.0 * t;
+        return Opacity(
+          opacity: opacity,
+          child: Transform.translate(
+            offset: Offset(0, translateY),
+            child: Transform.scale(
+              scale: scale,
+              child: child,
+            ),
+          ),
+        );
+      },
+      child: bubble,
     );
   }
+}
+
+class _BubbleTailPainter extends CustomPainter {
+  final Color color;
+  final Color borderColor;
+  const _BubbleTailPainter({required this.color, required this.borderColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paintFill = Paint()..color = color..style = PaintingStyle.fill;
+    final paintStroke = Paint()
+      ..color = borderColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+
+    final path = Path();
+    path.moveTo(0, 0);
+    path.lineTo(size.width / 2, size.height);
+    path.lineTo(size.width, 0);
+    path.close();
+
+    canvas.drawPath(path, paintFill);
+    canvas.drawPath(path, paintStroke);
+  }
+
+  @override
+  bool shouldRepaint(covariant _BubbleTailPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.borderColor != borderColor;
 }
 
 class ActionBar extends StatelessWidget {

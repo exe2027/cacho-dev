@@ -9,6 +9,7 @@ import '../widgets/casino_anims.dart';
 import '../widgets/coin_widgets.dart';
 import '../widgets/rotate_notice.dart';
 import '../state/wallet.dart';
+import '../config/room_configs.dart';
 
 /// Paleta casino de MENU (sin cafe, 25-oct): fondos oscuros de la
 /// familia del buscar_bg (azul noche -> casi negro -> purpura
@@ -818,13 +819,13 @@ class _LocalSetupScreenState extends State<LocalSetupScreen> {
   }
 }
 
-/// R9/R15/R17: hoja CON AMIGOS como pantalla propia. Mismo
-/// contenido y orden que la hoja anterior (crear, luego unirse),
-/// con la placa fija sobre CREAR y la sección de unirse también
-/// fija debajo (nada queda tapado ni fuera de alcance). Código de
-/// unirse en Cinzel 24 con tracking (R15, aplicado al campo donde
-/// el código existe antes de crear); la invitación por WhatsApp
-/// vive en el lobby y se anuncia allí (R15/R20).
+/// Pantalla moderna 'JUGAR CON AMIGOS' estilo Casino AAA (v3.0).
+/// Rediseñada desde cero:
+/// - Selector de pestañas: 'CREAR SALA' vs 'UNIRSE CON CÓDIGO'.
+/// - Carrusel visual de las 5 mesas 2D reales con sus apuestas y pozos.
+/// - Opciones de juego esenciales (Cacho Completo vs Clásico).
+/// - Indicadores interactivos de funciones sociales (Micrófono P2P & Rockola YouTube/Spotify).
+/// - Entrada estilizada de código de sala con botón 'Pegar'.
 class FriendsSetupScreen extends StatefulWidget {
   final String initialPreset;
   final bool? onlineOk;
@@ -836,6 +837,7 @@ class FriendsSetupScreen extends StatefulWidget {
     required String preset,
   }) onCreate;
   final void Function(String code) onJoin;
+
   const FriendsSetupScreen({
     super.key,
     required this.initialPreset,
@@ -850,268 +852,767 @@ class FriendsSetupScreen extends StatefulWidget {
   State<FriendsSetupScreen> createState() => _FriendsSetupScreenState();
 }
 
-class _FriendsSetupScreenState extends State<FriendsSetupScreen> {
-  var _stake = 500;
-  var _tableTheme = defaultTableTheme;
-  late var _preset = widget.initialPreset;
+class _FriendsSetupScreenState extends State<FriendsSetupScreen>
+    with SingleTickerProviderStateMixin {
+  int _activeTab = 0; // 0 = Crear Sala, 1 = Unirse
+  late int _selectedStake;
+  late String _preset;
+  bool _voiceChatActive = true;
+  bool _musicSocialActive = true;
+
+  // Las 5 mesas reales disponibles para salas privadas
+  final List<RoomConfig> _rooms = [
+    roomTaberna,
+    roomBoliche,
+    roomCasino,
+    roomMansion,
+    roomVip,
+  ];
 
   @override
   void initState() {
     super.initState();
-    if (_stake > Wallet.instance.balance) {
-      _stake = Wallet.stakes.lastWhere((x) => x <= Wallet.instance.balance,
-          orElse: () => Wallet.stakes.first);
+    _preset = widget.initialPreset;
+    _selectedStake = 500;
+    if (_selectedStake > Wallet.instance.balance) {
+      _selectedStake = Wallet.stakes.lastWhere(
+        (x) => x <= Wallet.instance.balance,
+        orElse: () => Wallet.stakes.first,
+      );
     }
   }
+
+  RoomConfig get _currentRoom =>
+      _rooms.firstWhere((r) => r.entryFee == _selectedStake, orElse: () => _rooms[2]);
 
   @override
   Widget build(BuildContext context) {
     final onlineOk = widget.onlineOk;
+
     return Scaffold(
-      body: DecoratedBox(
-        decoration: menuDecoration,
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              StaggerIn(
-                index: 0,
-                child: const SheetStrip(
-                  title: 'CON AMIGOS',
-                  // R17: modalidad en línea, sin cifra local mezclada.
-                  right: Text('EN LÍNEA',
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: CachoColors.gold)),
-                ),
+      backgroundColor: const Color(0xFF090E17),
+      body: Stack(
+        children: [
+          // Fondo ambiental cálido de taberna/casino difuminado
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0.35,
+              child: Image.asset(
+                _currentRoom.roomBackgroundAssetPath,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
               ),
-              // TODO HORIZONTAL: dos columnas (izquierda:
-              // intro/preset/mesa; derecha: apuesta + placa de
-              // billetera en línea). La placa ya no es pie: vive
-              // en la columna derecha, sin tapar nada.
-              Expanded(
-                child: _SetupColumns(
-                  left: [
-                    StaggerIn(
-                      index: 0,
-                      child: const Text(
-                        'Crea una sala y comparte el código, o únete '
-                        'con el código de un amigo. La sala puede '
-                        'rellenarse con bots.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            fontSize: 14, color: Colors.white70),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    StaggerIn(
-                      index: 1,
-                      child: PresetRow(
-                        preset: _preset,
-                        onChanged: (v) => setState(() => _preset = v),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    StaggerIn(
-                      index: 3,
-                      child: TableThemePicker(
-                        value: _tableTheme,
-                        onChanged: (v) =>
-                            setState(() => _tableTheme = v),
-                      ),
-                    ),
-                  ],
-                  right: [
-                    StaggerIn(
-                      index: 2,
-                      child: StakePicker(
-                        value: _stake,
-                        balance: Wallet.instance.balance,
-                        onChanged: (v) => setState(() => _stake = v),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    StaggerIn(
-                      index: 4,
-                      // R17: línea a 14 px sobre la placa, sin
-                      // cifra local mezclada.
-                      child: const Text('Billetera en línea',
-                          style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: CachoColors.gold)),
-                    ),
-                    const SizedBox(height: 6),
-                    StaggerIn(
-                      index: 4,
-                      child: PotPlaque(
-                        formula:
-                            'POZO = ${coinsText(_stake)} × jugadores al partir',
-                        saldoLine:
-                            'La apuesta se cobra al partir la partida; el ganador se lleva el pozo completo.',
-                      ),
-                    ),
+            ),
+          ),
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    const Color(0xFF070B12).withValues(alpha: 0.92),
+                    const Color(0xFF090E17).withValues(alpha: 0.96),
                   ],
                 ),
               ),
-              // TODO HORIZONTAL: pie en una fila (CREAR + campo
-              // código + UNIRSE) cuando hay ancho; apilado cuando
-              // no. La rama sin conexión se mantiene apilada por
-              // legibilidad. AN4: shimmer mate intacto.
-              StaggerIn(
-                index: 5,
-                child: LayoutBuilder(
-                  builder: (context, box) {
-                    final createButton = SweepGlow(
-                      cycle: const Duration(seconds: 3),
-                      peakOpacity: 0.12,
-                      child: SizedBox(
-                        height: 56,
-                        width: double.infinity,
-                        child: BronzeButton(
-                          label:
-                              onlineOk == null ? 'COMPROBANDO…' : 'CREAR SALA',
-                          icon: Icons.groups,
-                          fontSize: 18,
-                          fontFamily: CachoFonts.display,
-                          onPressed: onlineOk == true
-                              ? () {
-                                  Navigator.of(context).pop();
-                                  widget.onCreate(
-                                    stake: _stake,
-                                    tableTheme: _tableTheme,
-                                    preset: _preset,
-                                  );
-                                }
-                              : null,
-                        ),
-                      ),
-                    );
-                    final joinField = TextField(
-                      controller: widget.joinCode,
-                      textCapitalization: TextCapitalization.characters,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(
-                            RegExp(r'[A-Za-z0-9]')),
-                        LengthLimitingTextInputFormatter(6),
-                      ],
-                      // R15: código en Cinzel 24 con tracking,
-                      // sobre casino oscuro.
-                      style: const TextStyle(
-                          fontFamily: CachoFonts.display,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 3),
-                      decoration: const InputDecoration(
-                        labelText: 'Código de sala',
-                        hintText: 'Ej: K7QF',
-                      ),
-                    );
-                    final joinButton = BronzeButton(
-                      label: 'UNIRSE',
-                      onPressed: onlineOk == true
-                          ? () {
-                              final code =
-                                  widget.joinCode.text.trim().toUpperCase();
-                              // Sin pop si el código es corto: el
-                              // aviso sale aquí y el código no se
-                              // pierde.
-                              if (code.length < 4) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text(
-                                          'Escribe el código de la sala (ej: K7QF)')),
-                                );
-                                return;
-                              }
-                              Navigator.of(context).pop();
-                              widget.onJoin(code);
-                            }
-                          : null,
-                    );
-                    if (onlineOk == false) {
-                      return Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: CachoColors.casinoRed
-                                    .withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                    color: CachoColors.casinoRed
-                                        .withValues(alpha: 0.6)),
-                              ),
-                              child: const Text(
-                                'Sin conexión con el servidor de salas. '
-                                'Revisa tu internet y vuelve a intentarlo.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 14),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            SizedBox(
-                              height: 56,
-                              width: double.infinity,
-                              child: BronzeButton(
-                                label: 'REINTENTAR CONEXIÓN',
-                                onPressed: () {
-                                  Navigator.of(context).pop();
-                                  widget.onRetryProbe();
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                    if (box.maxWidth >= 700) {
-                      return Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints:
-                                const BoxConstraints(maxWidth: 1120),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                SizedBox(width: 210, child: createButton),
-                                const SizedBox(width: 12),
-                                Expanded(child: joinField),
-                                const SizedBox(width: 10),
-                                joinButton,
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          createButton,
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(child: joinField),
-                              const SizedBox(width: 10),
-                              joinButton,
-                            ],
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+            ),
+          ),
+
+          SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 1. Top Bar de Navegación con saldo del jugador
+                _buildTopBar(),
+
+                // Si no hay conexión al servidor
+                if (onlineOk == false) ...[
+                  Expanded(child: _buildOfflineState()),
+                ] else ...[
+                  // 2. Selector de Pestañas (CREAR SALA / UNIRSE)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    child: _buildTabBar(),
+                  ),
+
+                  // 3. Contenido de la pestaña activa
+                  Expanded(
+                    child: _activeTab == 0
+                        ? _buildCreateRoomTab()
+                        : _buildJoinRoomTab(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopBar() {
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: const BoxDecoration(
+        color: Color(0xFF090E17),
+        border: Border(bottom: BorderSide(color: Color(0xFF1F293D), width: 1)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, color: CachoColors.gold, size: 20),
+            tooltip: 'Volver',
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.groups, color: CachoColors.gold, size: 20),
+              SizedBox(width: 8),
+              Text(
+                'JUGAR CON AMIGOS',
+                style: TextStyle(
+                  fontFamily: CachoFonts.display,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: CachoColors.gold,
+                  letterSpacing: 1.5,
                 ),
               ),
             ],
           ),
+          // Billetera del usuario
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF121B2A),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: CachoColors.gold.withValues(alpha: 0.5)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.monetization_on, color: CachoColors.gold, size: 14),
+                const SizedBox(width: 4),
+                Text(
+                  coinsText(Wallet.instance.balance),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: CachoColors.gold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabBar() {
+    return Container(
+      height: 40,
+      decoration: BoxDecoration(
+        color: const Color(0xFF101726),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF1F293D)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _activeTab = 0),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                decoration: BoxDecoration(
+                  color: _activeTab == 0 ? CachoColors.gold : Colors.transparent,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.add_circle_outline,
+                        size: 16,
+                        color: _activeTab == 0 ? Colors.black : Colors.white70,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'CREAR SALA',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: _activeTab == 0 ? Colors.black : Colors.white70,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _activeTab = 1),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                decoration: BoxDecoration(
+                  color: _activeTab == 1 ? CachoColors.gold : Colors.transparent,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.vpn_key_rounded,
+                        size: 16,
+                        color: _activeTab == 1 ? Colors.black : Colors.white70,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'UNIRSE A SALA',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: _activeTab == 1 ? Colors.black : Colors.white70,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // TAB 1: CREAR SALA
+  // --------------------------------------------------------------------------
+  Widget _buildCreateRoomTab() {
+    final balance = Wallet.instance.balance;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'SELECCIONA LA MESA Y APUESTA',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: CachoColors.gold,
+              letterSpacing: 1.0,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Carrusel de las 5 mesas fotorrealistas 2D
+          SizedBox(
+            height: 124,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _rooms.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final room = _rooms[index];
+                final isSelected = _selectedStake == room.entryFee;
+                final canAfford = balance >= room.entryFee;
+
+                return GestureDetector(
+                  onTap: canAfford ? () => setState(() => _selectedStake = room.entryFee) : null,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 154,
+                    decoration: BoxDecoration(
+                      color: isSelected ? const Color(0xFF1A2338) : const Color(0xFF0F1524),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? CachoColors.gold : Colors.white12,
+                        width: isSelected ? 2.0 : 1.0,
+                      ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: CachoColors.gold.withValues(alpha: 0.3),
+                                blurRadius: 10,
+                                spreadRadius: 1,
+                              )
+                            ]
+                          : [],
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Imagen de la mesa 2D
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Image.asset(
+                                room.tableAssetPath,
+                                height: 50,
+                                width: 138,
+                                fit: BoxFit.cover,
+                              ),
+                              if (!canAfford)
+                                Container(
+                                  height: 50,
+                                  width: 138,
+                                  color: Colors.black.withValues(alpha: 0.65),
+                                  child: const Center(
+                                    child: Icon(Icons.lock, color: Colors.white70, size: 18),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        // Nombre y Apuesta
+                        Column(
+                          children: [
+                            Text(
+                              room.name,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: isSelected ? CachoColors.gold : Colors.white,
+                              ),
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.monetization_on, color: CachoColors.gold, size: 12),
+                                const SizedBox(width: 3),
+                                Text(
+                                  coinsText(room.entryFee),
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Fila: Modo de Juego + Funciones Sociales
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Modo de juego
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF101726),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF1F293D)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'MODO DE JUEGO',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: CachoColors.gold,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          _buildModeChip('Cacho Completo', 'completo'),
+                          const SizedBox(width: 6),
+                          _buildModeChip('Clásico', 'clasico'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+
+              // Funciones Sociales (Micrófono & Rockola)
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF101726),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF1F293D)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'FUNCIONES DE SALA',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: CachoColors.gold,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          _buildFeatureChip(
+                            icon: _voiceChatActive ? Icons.mic : Icons.mic_off,
+                            label: 'Voz P2P',
+                            active: _voiceChatActive,
+                            onTap: () => setState(() => _voiceChatActive = !_voiceChatActive),
+                          ),
+                          const SizedBox(width: 6),
+                          _buildFeatureChip(
+                            icon: Icons.music_note,
+                            label: 'Rockola DJ',
+                            active: _musicSocialActive,
+                            onTap: () => setState(() => _musicSocialActive = !_musicSocialActive),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Resumen del pozo y botón CREAR SALA
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0C1322),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: CachoColors.gold.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'POZO ESTIMADO: ${coinsText(_selectedStake * 6)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: CachoColors.gold,
+                      ),
+                    ),
+                    const Text(
+                      'La sala se puede rellenar con bots si faltan amigos.',
+                      style: TextStyle(fontSize: 10, color: Colors.white60),
+                    ),
+                  ],
+                ),
+                SizedBox(
+                  height: 40,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: CachoColors.gold,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.rocket_launch, size: 16),
+                    label: const Text(
+                      'CREAR SALA',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900),
+                    ),
+                    onPressed: widget.onlineOk == true
+                        ? () {
+                            Navigator.of(context).pop();
+                            widget.onCreate(
+                              stake: _selectedStake,
+                              tableTheme: defaultTableTheme,
+                              preset: _preset,
+                            );
+                          }
+                        : null,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeChip(String label, String value) {
+    final isSelected = _preset == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _preset = value),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? CachoColors.gold.withValues(alpha: 0.2) : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: isSelected ? CachoColors.gold : Colors.white24),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected ? CachoColors.gold : Colors.white70,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeatureChip({
+    required IconData icon,
+    required String label,
+    required bool active,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          decoration: BoxDecoration(
+            color: active ? const Color(0xFF1E3A2F) : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: active ? const Color(0xFF4CAF50) : Colors.white24,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 14, color: active ? const Color(0xFF4CAF50) : Colors.white54),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  color: active ? Colors.white : Colors.white54,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // TAB 2: UNIRSE A SALA
+  // --------------------------------------------------------------------------
+  Widget _buildJoinRoomTab() {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFF101726),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: CachoColors.gold.withValues(alpha: 0.4)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.5),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Icon(Icons.vpn_key_rounded, color: CachoColors.gold, size: 36),
+              const SizedBox(height: 8),
+              const Text(
+                'CÓDIGO DE INVITACIÓN',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: CachoFonts.display,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: CachoColors.gold,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Ingresa el código de 4 a 6 caracteres que te compartió tu amigo:',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11, color: Colors.white70),
+              ),
+              const SizedBox(height: 14),
+
+              // Campo de entrada de código con botón Pegar
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: widget.joinCode,
+                      textCapitalization: TextCapitalization.characters,
+                      textAlign: TextAlign.center,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
+                        LengthLimitingTextInputFormatter(6),
+                      ],
+                      style: const TextStyle(
+                        fontFamily: CachoFonts.display,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: CachoColors.gold,
+                        letterSpacing: 4,
+                      ),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: const Color(0xFF090E17),
+                        hintText: 'EJ: K7QF',
+                        hintStyle: const TextStyle(
+                          fontSize: 16,
+                          letterSpacing: 2,
+                          color: Colors.white24,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFF1F293D)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: CachoColors.gold, width: 2),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A263D),
+                      foregroundColor: CachoColors.gold,
+                    ),
+                    icon: const Icon(Icons.content_paste, size: 20),
+                    tooltip: 'Pegar código',
+                    onPressed: () async {
+                      final data = await Clipboard.getData(Clipboard.kTextPlain);
+                      if (data?.text != null) {
+                        setState(() {
+                          widget.joinCode.text = data!.text!.trim().toUpperCase();
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Botón Unirse
+              SizedBox(
+                height: 46,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: CachoColors.gold,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.login, size: 18),
+                  label: const Text(
+                    'ENTRAR A LA SALA',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
+                  ),
+                  onPressed: widget.onlineOk == true
+                      ? () {
+                          final code = widget.joinCode.text.trim().toUpperCase();
+                          if (code.length < 4) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('El código debe tener al menos 4 caracteres (ej: K7QF)'),
+                              ),
+                            );
+                            return;
+                          }
+                          Navigator.of(context).pop();
+                          widget.onJoin(code);
+                        }
+                      : null,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOfflineState() {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1218),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.wifi_off_rounded, color: Colors.redAccent, size: 36),
+            const SizedBox(height: 10),
+            const Text(
+              'Sin conexión con el servidor',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Revisa tu conexión a internet para jugar con amigos.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Colors.white70),
+            ),
+            const SizedBox(height: 14),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('REINTENTAR', style: TextStyle(fontWeight: FontWeight.w800)),
+              onPressed: () {
+                Navigator.of(context).pop();
+                widget.onRetryProbe();
+              },
+            ),
+          ],
         ),
       ),
     );

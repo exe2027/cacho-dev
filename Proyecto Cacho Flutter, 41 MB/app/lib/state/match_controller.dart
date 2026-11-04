@@ -82,13 +82,15 @@ class UiEvent {
   final String type;
   final Bid? bid;
   const UiEvent(this.playerId, this.type, this.bid);
-  factory UiEvent.fromEngine(GameEvent e) => UiEvent(e.playerId, e.type.name, e.bid);
+  factory UiEvent.fromEngine(GameEvent e) =>
+      UiEvent(e.playerId, e.type.name, e.bid);
   factory UiEvent.fromJson(Map<String, dynamic> j) => UiEvent(
         j['playerId'] as String,
         j['type'] as String,
         j['bid'] == null
             ? null
-            : Bid((j['bid'] as Map)['quantity'] as int, (j['bid'] as Map)['face'] as int),
+            : Bid((j['bid'] as Map)['quantity'] as int,
+                (j['bid'] as Map)['face'] as int),
       );
 }
 
@@ -169,7 +171,8 @@ class UiResolution {
         loserId: j['loserId'] as String?,
         gainerId: j['gainerId'] as String?,
         revealed: ((j['revealedHands'] as Map?) ?? {}).map(
-          (k, v) => MapEntry(k.toString(), (v as List).map((e) => e as int).toList()),
+          (k, v) =>
+              MapEntry(k.toString(), (v as List).map((e) => e as int).toList()),
         ),
         actualCount: j['actualCount'] as int?,
         kamikazeFace: j['kamikazeFace'] as int?,
@@ -182,12 +185,54 @@ class UiResolution {
       );
 }
 
-const _botNames = ['El Guatón', 'La Cuca', 'Don Chalo', 'La Pituca', 'El Huaso', 'La Rusa', 'El Flaco', 'La Morocha', 'Don Lucho', 'El Pije', 'La Juanita', 'El Rucio'];
+// Banco de nombres de bots y jugadores: SOLO UNA PALABRA, MÁXIMO 12 CARACTERES
+const _botNames = [
+  'Chalo',
+  'Cuca',
+  'Guaton',
+  'Pituca',
+  'Huaso',
+  'Mateo',
+  'Sofi',
+  'Nacho',
+  'Cata',
+  'Lucho',
+  'Pancho',
+  'Checho',
+  'Tito',
+  'Diego',
+  'Vale',
+  'Mati',
+  'Javi',
+  'Fran',
+  'Benja',
+  'Isi',
+  'Lucas',
+  'Pato',
+  'Camila',
+  'Rodrigo',
+  'Martina',
+  'Vicente',
+  'Tomas',
+  'Agustin',
+  'Maxi',
+  'Pepe',
+];
+
+String cleanSingleWordName(String raw) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) return 'Jugador';
+  final first = trimmed.split(RegExp(r'\s+')).first;
+  return first.length > 12 ? first.substring(0, 12) : first;
+}
 
 /// Controlador de una partida: la misma pantalla sirve para el modo local
 /// contra bots (motor Dart en el propio teléfono) y para salas en línea
 /// (el servidor manda; aquí solo se refleja su estado).
 class MatchController extends ChangeNotifier {
+  static MatchController? activeSession;
+
+  bool get isGameOver => phase == 'finished' || winnerId != null;
   final bool online;
   final GameConfig uiConfig;
   final Duration botDelay;
@@ -267,12 +312,13 @@ class MatchController extends ChangeNotifier {
   String? emoteGlyph;
   int emoteSeq = 0;
 
-  /// Muestra una reacción (local, o recibida del servidor cuando
-  /// el relay exista). No toca mano, turno ni apuesta.
+  /// Muestra una reacción o frase rápida (local o recibida del
+  /// servidor). No toca mano, turno ni apuesta.
   void showEmote(String playerId, String glyph) {
-    if (!emotes.contains(glyph)) return;
+    final clean = glyph.trim();
+    if (clean.isEmpty) return;
     emotePlayerId = playerId;
-    emoteGlyph = glyph;
+    emoteGlyph = clean;
     emoteSeq++;
     notifyListeners();
   }
@@ -280,6 +326,36 @@ class MatchController extends ChangeNotifier {
   /// Reacción mía. En línea se muestra en local y se envía al
   /// servidor, que la difunde a la sala (relay 26-oct). No toca
   /// mano, turno ni apuesta.
+
+  void pauseTimers() {
+    _botTimer?.cancel();
+    _turnTimer?.cancel();
+    _music?.player.pause();
+    notifyListeners();
+  }
+
+  void resumeTimers() {
+    if (_disposed || isGameOver) return;
+    if (!online && _engine != null) {
+      _scheduleLocal();
+    }
+    notifyListeners();
+  }
+
+  void pauseMusic() {
+    try {
+      _music?.player.pause();
+    } catch (_) {}
+  }
+
+  bool sendQuickChat(String text) {
+    final clean = text.trim();
+    if (myId.isEmpty || clean.isEmpty) return false;
+    showEmote(myId, clean);
+    if (online) _send({'type': 'chat', 'message': clean});
+    return true;
+  }
+
   bool sendEmote(String glyph) {
     if (!emotes.contains(glyph)) return false;
     if (myId.isEmpty) return false;
@@ -296,6 +372,7 @@ class MatchController extends ChangeNotifier {
     emoteGlyph = null;
     notifyListeners();
   }
+
   String? errorMessage;
   String? lastNotice;
   bool handHidden = true;
@@ -338,12 +415,17 @@ class MatchController extends ChangeNotifier {
   bool get iAmDj => _music != null && _music!.djId == myId;
 
   void _ensureMusic() {
-    if (!online || _music != null) return;
+    if (_music != null) return;
     final svc = MusicService();
     svc.anyMicOn = () =>
-        myMicOn || _micById.values.any((v) => v) ||
-        players.any((p) => p.micOn);
-    svc.onEnded = () => _send({'type': 'music_ended'});
+        myMicOn || _micById.values.any((v) => v) || players.any((p) => p.micOn);
+    svc.onEnded = () {
+      if (online) {
+        _send({'type': 'music_ended'});
+      } else {
+        djNext();
+      }
+    };
     svc.onActiveChanged = (active) {
       AudioService.djTakeover = active;
       AudioService.instance.syncAmbience();
@@ -369,32 +451,239 @@ class MatchController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void claimDj() => _send({'type': 'music_claim'});
-  void releaseDj() => _send({'type': 'music_release'});
+  void claimDj() {
+    _ensureMusic();
+    if (online) {
+      _send({'type': 'music_claim'});
+    } else {
+      _applyLocalMusicState(djId: myId);
+    }
+  }
+
+  void releaseDj() {
+    if (online) {
+      _send({'type': 'music_release'});
+    } else {
+      _applyLocalMusicState(djId: null);
+    }
+  }
+
   void addMusic(MusicTrack t) {
-    // El toque en "agregar" ceba el reproductor (iOS): si este tema
-    // parte de inmediato, el navegador ya dejó la puerta abierta.
+    _ensureMusic();
     _music?.primeWithGesture();
-    _send({'type': 'music_add', ...t.toAddJson()});
+    if (online) {
+      _send({'type': 'music_add', ...t.toAddJson()});
+    } else {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final cur = _music?.current;
+      final q = List<MusicTrack>.from(_music?.queue ?? []);
+      if (cur == null) {
+        final track = MusicTrack(
+          videoId: t.videoId,
+          title: t.title,
+          channel: t.channel,
+          thumb: t.thumb,
+          durationSec: t.durationSec,
+          byId: myId,
+          byName: myNickname,
+          startedAt: now,
+        );
+        _applyLocalMusicState(djId: myId, current: track, queue: q);
+      } else {
+        q.add(MusicTrack(
+          videoId: t.videoId,
+          title: t.title,
+          channel: t.channel,
+          thumb: t.thumb,
+          durationSec: t.durationSec,
+          byId: myId,
+          byName: myNickname,
+        ));
+        _applyLocalMusicState(djId: _music?.djId ?? myId, current: cur, queue: q);
+      }
+    }
   }
 
   /// El DJ se salta la cola: este tema suena AHORA (recién buscado).
   void djPlayNow(MusicTrack t) {
+    _ensureMusic();
     _music?.primeWithGesture();
-    _send({'type': 'music_play_now', ...t.toAddJson()});
+    if (online) {
+      _send({'type': 'music_play_now', ...t.toAddJson()});
+    } else {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final track = MusicTrack(
+        videoId: t.videoId,
+        title: t.title,
+        channel: t.channel,
+        thumb: t.thumb,
+        durationSec: t.durationSec,
+        byId: myId,
+        byName: myNickname,
+        startedAt: now,
+      );
+      _applyLocalMusicState(djId: myId, current: track, queue: _music?.queue ?? []);
+    }
   }
 
   /// El DJ se salta la cola: suena ahora este tema que ya esperaba.
   void djPlayNowQueued(String videoId) {
+    _ensureMusic();
     _music?.primeWithGesture();
-    _send({'type': 'music_play_now', 'videoId': videoId});
+    if (online) {
+      _send({'type': 'music_play_now', 'videoId': videoId});
+    } else {
+      final q = List<MusicTrack>.from(_music?.queue ?? []);
+      final idx = q.indexWhere((x) => x.videoId == videoId);
+      if (idx != -1) {
+        final t = q.removeAt(idx);
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final track = MusicTrack(
+          videoId: t.videoId,
+          title: t.title,
+          channel: t.channel,
+          thumb: t.thumb,
+          durationSec: t.durationSec,
+          byId: t.byId,
+          byName: t.byName,
+          startedAt: now,
+        );
+        _applyLocalMusicState(djId: myId, current: track, queue: q);
+      }
+    }
   }
-  void removeMusic(int index) =>
+
+  void removeMusic(int index) {
+    if (online) {
       _send({'type': 'music_remove', 'index': index});
-  void djPlay() => _send({'type': 'music_play'});
-  void djPause() => _send({'type': 'music_pause'});
-  void djNext() => _send({'type': 'music_next'});
-  void voteSkipMusic() => _send({'type': 'music_vote_skip'});
+    } else {
+      final q = List<MusicTrack>.from(_music?.queue ?? []);
+      if (index >= 0 && index < q.length) {
+        q.removeAt(index);
+        _applyLocalMusicState(djId: _music?.djId ?? myId, current: _music?.current, queue: q);
+      }
+    }
+  }
+
+  void djPlay() {
+    if (online) {
+      _send({'type': 'music_play'});
+    } else {
+      final cur = _music?.current;
+      if (cur != null && cur.paused) {
+        final pausedDuration = cur.pausedAt != null
+            ? DateTime.now().millisecondsSinceEpoch - cur.pausedAt!
+            : 0;
+        final track = MusicTrack(
+          videoId: cur.videoId,
+          title: cur.title,
+          channel: cur.channel,
+          thumb: cur.thumb,
+          durationSec: cur.durationSec,
+          byId: cur.byId,
+          byName: cur.byName,
+          startedAt: cur.startedAt + pausedDuration,
+          pausedAt: null,
+        );
+        _applyLocalMusicState(djId: _music?.djId ?? myId, current: track, queue: _music?.queue ?? []);
+      }
+    }
+  }
+
+  void djPause() {
+    if (online) {
+      _send({'type': 'music_pause'});
+    } else {
+      final cur = _music?.current;
+      if (cur != null && !cur.paused) {
+        final track = MusicTrack(
+          videoId: cur.videoId,
+          title: cur.title,
+          channel: cur.channel,
+          thumb: cur.thumb,
+          durationSec: cur.durationSec,
+          byId: cur.byId,
+          byName: cur.byName,
+          startedAt: cur.startedAt,
+          pausedAt: DateTime.now().millisecondsSinceEpoch,
+        );
+        _applyLocalMusicState(djId: _music?.djId ?? myId, current: track, queue: _music?.queue ?? []);
+      }
+    }
+  }
+
+  void djNext() {
+    if (online) {
+      _send({'type': 'music_next'});
+    } else {
+      final q = List<MusicTrack>.from(_music?.queue ?? []);
+      if (q.isNotEmpty) {
+        final nextTrack = q.removeAt(0);
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final track = MusicTrack(
+          videoId: nextTrack.videoId,
+          title: nextTrack.title,
+          channel: nextTrack.channel,
+          thumb: nextTrack.thumb,
+          durationSec: nextTrack.durationSec,
+          byId: nextTrack.byId,
+          byName: nextTrack.byName,
+          startedAt: now,
+        );
+        _applyLocalMusicState(djId: _music?.djId ?? myId, current: track, queue: q);
+      } else {
+        _applyLocalMusicState(djId: _music?.djId ?? myId, current: null, queue: []);
+      }
+    }
+  }
+
+  void voteSkipMusic() {
+    if (online) {
+      _send({'type': 'music_vote_skip'});
+    } else {
+      djNext();
+    }
+  }
+
+  void _applyLocalMusicState({
+    String? djId,
+    MusicTrack? current,
+    List<MusicTrack>? queue,
+  }) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    _music?.applyState({
+      'djId': djId,
+      'current': current == null
+          ? null
+          : {
+              'videoId': current.videoId,
+              'title': current.title,
+              'channel': current.channel,
+              'thumb': current.thumb,
+              'durationSec': current.durationSec,
+              'byId': current.byId,
+              'byName': current.byName,
+              'startedAt': current.startedAt,
+              'pausedAt': current.pausedAt,
+            },
+      'queue': [
+        for (final t in (queue ?? _music?.queue ?? []))
+          {
+            'videoId': t.videoId,
+            'title': t.title,
+            'channel': t.channel,
+            'thumb': t.thumb,
+            'durationSec': t.durationSec,
+            'byId': t.byId,
+            'byName': t.byName,
+          }
+      ],
+      'skipVotes': 0,
+      'skipNeeded': 1,
+      'sentAt': now,
+    });
+    notifyListeners();
+  }
 
   // Voz en línea (WebRTC en malla; ver voice.dart)
   VoiceService? _voice;
@@ -440,25 +729,39 @@ class MatchController extends ChangeNotifier {
     );
     c.guided = guided;
     c.stake = guided ? 0 : stake;
-    c.tableTheme = isValidTableTheme(tableTheme) ? tableTheme : defaultTableTheme;
+    c.tableTheme =
+        isValidTableTheme(tableTheme) ? tableTheme : defaultTableTheme;
     c.localBotCount = botCount;
     c.localDifficultyName = difficulty.name;
-    c.myNickname = nickname;
+    final cleanUser = cleanSingleWordName(nickname);
+    c.myNickname = cleanUser;
     c.myId = 'yo';
     c.isHost = true;
     final list = <({String id, String name})>[
-      (id: 'yo', name: nickname),
+      (id: 'yo', name: cleanUser),
     ];
+
+    // Emparejar con bots aleatorios únicos (1 palabra, max 12 chars)
+    final rng = Random();
+    final availableBots = List<String>.from(_botNames)..shuffle(rng);
+    availableBots.removeWhere((b) => b.toLowerCase() == cleanUser.toLowerCase());
+    final chosenBots = availableBots.take(botCount).toList();
+
     for (var i = 0; i < botCount; i++) {
       final id = 'bot${i + 1}';
-      list.add((id: id, name: 'Bot ${_botNames[i % _botNames.length]}'));
-      c._brains[id] = BotBrain(difficulty);
+      final botName = chosenBots[i];
+      list.add((id: id, name: botName));
+      final bDiff = (i % 2 == 0)
+          ? difficulty
+          : (rng.nextBool() ? BotDifficulty.media : difficulty);
+      c._brains[id] = BotBrain(bDiff);
     }
     c._engine = GameEngine(
       config: config,
       roller: roller ?? RandomDiceRoller(),
       playerList: list,
     );
+    activeSession = c;
     return c;
   }
 
@@ -468,8 +771,7 @@ class MatchController extends ChangeNotifier {
     if (stake > 0 && !Wallet.instance.charge(stake)) stake = 0;
     pot = stake * _engine!.players.length;
     potFixed = pot;
-    final starter = _engine!.startGame();
-    lastNotice = 'Sorteo: parte ${_engine!.playerById(starter).name}';
+    _engine!.startGame();
     gameStarted = true;
     gameStartTime = DateTime.now();
     _syncLocal();
@@ -486,10 +788,12 @@ class MatchController extends ChangeNotifier {
     int stake = 500,
     String tableTheme = defaultTableTheme,
   }) {
-    final c = MatchController._(online: true, uiConfig: config, serverUrl: kServerUrl);
+    final c = MatchController._(
+        online: true, uiConfig: config, serverUrl: kServerUrl);
     c.myNickname = nickname;
     c.stake = stake;
-    c.tableTheme = isValidTableTheme(tableTheme) ? tableTheme : defaultTableTheme;
+    c.tableTheme =
+        isValidTableTheme(tableTheme) ? tableTheme : defaultTableTheme;
     c._connect();
     c._send({
       'type': 'create_room',
@@ -523,7 +827,8 @@ class MatchController extends ChangeNotifier {
     required String code,
     required GameConfig config,
   }) {
-    final c = MatchController._(online: true, uiConfig: config, serverUrl: kServerUrl);
+    final c = MatchController._(
+        online: true, uiConfig: config, serverUrl: kServerUrl);
     c.myNickname = nickname;
     c._connect();
     c._send({
@@ -556,7 +861,8 @@ class MatchController extends ChangeNotifier {
     required String code,
     required GameConfig config,
   }) {
-    final c = MatchController._(online: true, uiConfig: config, serverUrl: kServerUrl);
+    final c = MatchController._(
+        online: true, uiConfig: config, serverUrl: kServerUrl);
     c.myNickname = nickname;
     c._connect();
     c._send({
@@ -690,8 +996,7 @@ class MatchController extends ChangeNotifier {
     _micById[myId] = next;
     _send({'type': 'mic', 'on': next});
     players = [
-      for (final p in players)
-        p.id == myId ? p.copyWith(micOn: next) : p,
+      for (final p in players) p.id == myId ? p.copyWith(micOn: next) : p,
     ];
     notifyListeners();
   }
@@ -743,17 +1048,22 @@ class MatchController extends ChangeNotifier {
             eliminated: false,
             ready: j['ready'] as bool,
             balance: (j['balance'] as num?)?.toInt(),
-            micOn: _micById[j['id'] as String] ??
-                (j['micOn'] as bool? ?? false),
+            micOn:
+                _micById[j['id'] as String] ?? (j['micOn'] as bool? ?? false),
           );
         }).toList();
       case 'game_started':
         gameStarted = true;
-        gameStartTime = DateTime.now();
+        gameStartTime ??= DateTime.now();
         phase = 'playing';
       case 'state':
         final s = m['state'] as Map<String, dynamic>;
         phase = s['phase'] as String;
+        if (phase == 'playing') {
+          gameStarted = true;
+          gameStartTime ??=
+              DateTime.now(); // También al reingresar a una partida.
+        }
         round = s['round'] as int;
         currentBid = s['currentBid'] == null
             ? null
@@ -785,8 +1095,8 @@ class MatchController extends ChangeNotifier {
             diceCount: j['diceCount'] as int,
             eliminated: j['eliminated'] as bool,
             ready: true,
-            micOn: _micById[j['id'] as String] ??
-                (j['micOn'] as bool? ?? false),
+            micOn:
+                _micById[j['id'] as String] ?? (j['micOn'] as bool? ?? false),
             dcDeadlineMs: (j['dcDeadline'] as num?)?.toInt(),
             cupSkinId: j['cupSkinId'] as String?,
             diceSkinId: j['diceSkinId'] as String?,
@@ -796,9 +1106,8 @@ class MatchController extends ChangeNotifier {
             .map((e) => UiEvent.fromJson(e as Map<String, dynamic>))
             .toList();
         final endsAt = s['turnEndsAt'] as int?;
-        turnEndsAt = endsAt == null
-            ? null
-            : DateTime.fromMillisecondsSinceEpoch(endsAt);
+        turnEndsAt =
+            endsAt == null ? null : DateTime.fromMillisecondsSinceEpoch(endsAt);
         _absorbEvents();
         if (round != _lastRound) {
           handHidden = true;
@@ -812,7 +1121,8 @@ class MatchController extends ChangeNotifier {
           _handRound = r;
         }
       case 'resolution':
-        _showResolution(UiResolution.fromJson(m['resolution'] as Map<String, dynamic>));
+        _showResolution(
+            UiResolution.fromJson(m['resolution'] as Map<String, dynamic>));
       case 'game_over':
         phase = 'finished';
         winnerId = m['winnerId'] as String?;
@@ -836,11 +1146,8 @@ class MatchController extends ChangeNotifier {
             final pid = m['playerId'];
             final n = (pid is String ? playerById(pid)?.nickname : null) ??
                 'Un jugador';
-            lastNotice =
-                '$n quedó eliminado por no jugar (3 turnos vencidos).';
+            lastNotice = '$n quedó eliminado por no jugar (3 turnos vencidos).';
           }
-        } else if (m['kind'] == 'starter' && m['text'] is String) {
-          lastNotice = m['text'] as String;
         } else if (m['kind'] == 'player_left') {
           // Desconexión en partida (24-oct): aviso a toda la mesa.
           final pid = m['playerId'];
@@ -900,6 +1207,12 @@ class MatchController extends ChangeNotifier {
         final pid = m['playerId'] as String?;
         final glyph = m['emote'] as String?;
         if (pid != null && glyph != null) showEmote(pid, glyph);
+        break;
+      case 'chat':
+        final cpid = m['playerId'] as String?;
+        final msg = m['message'] as String?;
+        if (cpid != null && msg != null) showEmote(cpid, msg);
+        break;
     }
     if (myId.isNotEmpty) {
       _ensureVoice();
@@ -948,7 +1261,8 @@ class MatchController extends ChangeNotifier {
   // ---------- consultas compartidas ----------
 
   PlayerView? get me => players.where((p) => p.id == myId).firstOrNull;
-  PlayerView? playerById(String id) => players.where((p) => p.id == id).firstOrNull;
+  PlayerView? playerById(String id) =>
+      players.where((p) => p.id == id).firstOrNull;
   bool get isMyTurn => phase == 'playing' && currentPlayerId == myId;
   String? get actorId => switch (phase) {
         'playing' => currentPlayerId,
@@ -969,7 +1283,9 @@ class MatchController extends ChangeNotifier {
       var bestFace = 6;
       var best = -1;
       for (var f = 2; f <= 6; f++) {
-        final c = myHand.where((d) => d == f || (uiConfig.wildcardsEffective && d == 1)).length;
+        final c = myHand
+            .where((d) => d == f || (uiConfig.wildcardsEffective && d == 1))
+            .length;
         if (c > best) {
           best = c;
           bestFace = f;
@@ -1012,7 +1328,10 @@ class MatchController extends ChangeNotifier {
     if (online) {
       _send({
         'type': 'action',
-        'action': {'type': 'bid', 'bid': {'quantity': b.quantity, 'face': b.face}},
+        'action': {
+          'type': 'bid',
+          'bid': {'quantity': b.quantity, 'face': b.face}
+        },
       });
     } else {
       _local(() => _engine!.bid(myId, b), null);
@@ -1023,7 +1342,10 @@ class MatchController extends ChangeNotifier {
     AudioService.instance.hapticLight();
     AudioService.instance.paso();
     if (online) {
-      _send({'type': 'action', 'action': {'type': 'paso'}});
+      _send({
+        'type': 'action',
+        'action': {'type': 'paso'}
+      });
     } else {
       _local(() => _engine!.paso(myId), null);
     }
@@ -1031,7 +1353,10 @@ class MatchController extends ChangeNotifier {
 
   void doDudo() {
     if (online) {
-      _send({'type': 'action', 'action': {'type': 'dudo'}});
+      _send({
+        'type': 'action',
+        'action': {'type': 'dudo'}
+      });
     } else {
       _local(() => null, () => _engine!.dudo(myId));
     }
@@ -1039,7 +1364,10 @@ class MatchController extends ChangeNotifier {
 
   void doCalzo() {
     if (online) {
-      _send({'type': 'action', 'action': {'type': 'calzo'}});
+      _send({
+        'type': 'action',
+        'action': {'type': 'calzo'}
+      });
     } else {
       _local(() => null, () => _engine!.calzo(myId));
     }
@@ -1047,7 +1375,10 @@ class MatchController extends ChangeNotifier {
 
   void doDudoPaso() {
     if (online) {
-      _send({'type': 'action', 'action': {'type': 'dudoPaso'}});
+      _send({
+        'type': 'action',
+        'action': {'type': 'dudoPaso'}
+      });
     } else {
       _local(() => null, () => _engine!.dudoPaso(myId));
     }
@@ -1055,7 +1386,10 @@ class MatchController extends ChangeNotifier {
 
   void doCalzoPaso() {
     if (online) {
-      _send({'type': 'action', 'action': {'type': 'calzoPaso'}});
+      _send({
+        'type': 'action',
+        'action': {'type': 'calzoPaso'}
+      });
     } else {
       _local(() => null, () => _engine!.calzoPaso(myId));
     }
@@ -1113,33 +1447,11 @@ class MatchController extends ChangeNotifier {
     _scheduleLocal();
   }
 
-  int _lastRoundNotice = 0;
-
   void _syncLocal() {
     final e = _engine;
     if (e == null) return;
     phase = e.phase.name;
     round = e.roundNumber;
-    // Al partir cada ronda se anuncia quién parte y por qué
-    // (regla: parte quien perdió un dado; si nadie perdió porque
-    // el Calzo fue exacto, parte quien calzó).
-    if (e.phase == GamePhase.playing &&
-        e.roundNumber != _lastRoundNotice &&
-        e.currentPlayerId != null) {
-      _lastRoundNotice = e.roundNumber;
-      final starter = e.playerById(e.currentPlayerId!);
-      final res = e.lastResolution;
-      final why = e.roundNumber == 1 || res == null
-          ? 'salió en el sorteo'
-          : res.type == ResolutionType.kamikaze
-              ? 'activó el Kamikaze'
-              : res.loserId == starter.id
-                  ? 'perdió un dado'
-                  : res.gainerId == starter.id
-                      ? 'calzó justo'
-                      : 'sigue la ronda';
-      lastNotice = 'Ronda ${e.roundNumber}: parte ${starter.name} ($why)';
-    }
     currentBid = e.currentBid;
     lastBidderId = e.lastBidderId;
     currentPlayerId = e.currentPlayerId;
@@ -1200,8 +1512,8 @@ class MatchController extends ChangeNotifier {
               milliseconds: _botRng.nextInt(botDelay.inMilliseconds ~/ 2 + 1));
       _botTimer = Timer(think, () => _botAct(actor));
     } else if (actor == myId && useTurnTimer) {
-      turnEndsAt = DateTime.now()
-          .add(Duration(seconds: e.config.turnTimerSeconds));
+      turnEndsAt =
+          DateTime.now().add(Duration(seconds: e.config.turnTimerSeconds));
       _turnTimer = Timer(Duration(seconds: e.config.turnTimerSeconds), () {
         // Abandono (misma regla que en línea): al tercer tiempo
         // vencido seguido, eliminado en vez de bot.
@@ -1276,7 +1588,8 @@ class MatchController extends ChangeNotifier {
         }
       } else if (e.phase == GamePhase.kamikazeOffer &&
           e.kamikazeOfferPlayerId == id) {
-        final accept = asTimeout ? false : brain.shouldAcceptKamikaze(_botCtx(id));
+        final accept =
+            asTimeout ? false : brain.shouldAcceptKamikaze(_botCtx(id));
         if (accept) AudioService.instance.drumroll();
         e.respondKamikaze(id, accept: accept);
       } else if (e.phase == GamePhase.kamikazeChoice &&
@@ -1338,6 +1651,7 @@ class MatchController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    if (activeSession == this) activeSession = null;
     _voice?.dispose();
     _music?.dispose();
     AudioService.djTakeover = false;

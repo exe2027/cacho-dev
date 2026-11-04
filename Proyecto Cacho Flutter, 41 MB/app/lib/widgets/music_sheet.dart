@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 
 import '../state/match_controller.dart';
@@ -248,9 +249,18 @@ class _MusicSheetState extends State<MusicSheet> {
     return 'Jugador';
   }
 
-  Future<void> _doSearch() async {
-    final q = _searchCtrl.text.trim();
-    if (q.isEmpty) return;
+  @override
+  void initState() {
+    super.initState();
+    // Carga inicial de éxitos para no mostrar la lista vacía
+    YoutubeApi.search('').then((hits) {
+      if (mounted) setState(() => _results = hits);
+    });
+  }
+
+  Future<void> _doSearch([String? explicitQuery]) async {
+    final q = explicitQuery ?? _searchCtrl.text.trim();
+    if (explicitQuery != null) _searchCtrl.text = explicitQuery;
     setState(() {
       _searching = true;
       _searchMsg = null;
@@ -267,7 +277,7 @@ class _MusicSheetState extends State<MusicSheet> {
       if (!mounted) return;
       setState(() {
         _searching = false;
-        _searchMsg = 'No se pudo buscar ahora. Prueba de nuevo.';
+        _searchMsg = 'No se pudo buscar ahora. Prueba con otro tema.';
       });
     }
   }
@@ -586,28 +596,21 @@ class _MusicSheetState extends State<MusicSheet> {
   // ---------- Buscar ----------
 
   Widget _searchTab() {
-    if (!YoutubeApi.hasKey) {
-      return const _NotConnected(
-        icon: Icons.search_off,
-        text: 'El buscador se enciende cuando el proyecto de Google de '
-            'la app quede conectado (un paso breve del dueño). La cola, '
-            'el DJ y la sincronía ya están funcionando.',
-      );
-    }
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
           child: Row(
             children: [
               Expanded(
                 child: TextField(
                   controller: _searchCtrl,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: Colors.white, fontSize: 13.5),
                   decoration: const InputDecoration(
-                    hintText: 'Busca un tema o un artista…',
-                    hintStyle: TextStyle(color: Colors.white38),
-                    prefixIcon: Icon(Icons.search, color: Colors.white54),
+                    hintText: 'Busca un tema, artista o pega un link de YouTube…',
+                    hintStyle: TextStyle(color: Colors.white38, fontSize: 12),
+                    prefixIcon: Icon(Icons.search, color: CachoColors.gold, size: 20),
+                    isDense: true,
                     enabledBorder: UnderlineInputBorder(
                       borderSide: BorderSide(color: Colors.white24),
                     ),
@@ -619,26 +622,67 @@ class _MusicSheetState extends State<MusicSheet> {
                   onSubmitted: (_) => _doSearch(),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
+              // Botón Pegar enlace
+              IconButton(
+                icon: const Icon(Icons.content_paste, color: CachoColors.gold, size: 18),
+                tooltip: 'Pegar enlace de YouTube',
+                onPressed: () async {
+                  final data = await Clipboard.getData(Clipboard.kTextPlain);
+                  if (data?.text != null && data!.text!.trim().isNotEmpty) {
+                    _doSearch(data.text!.trim());
+                  }
+                },
+              ),
               FilledButton(
-                onPressed: _searching ? null : _doSearch,
+                style: FilledButton.styleFrom(
+                  backgroundColor: CachoColors.gold,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  minimumSize: const Size(0, 36),
+                ),
+                onPressed: _searching ? null : () => _doSearch(),
                 child: _searching
                     ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
                       )
-                    : const Text('Buscar'),
+                    : const Text('Buscar', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
               ),
             ],
           ),
         ),
+
+        // Chips de búsqueda rápida de éxitos de fiesta / cantina
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Row(
+            children: [
+              _buildSearchChip('Los Prisioneros'),
+              const SizedBox(width: 6),
+              _buildSearchChip('Chico Trujillo'),
+              const SizedBox(width: 6),
+              _buildSearchChip('Amar Azul'),
+              const SizedBox(width: 6),
+              _buildSearchChip('Los Bunkers'),
+              const SizedBox(width: 6),
+              _buildSearchChip('Los Jaivas'),
+              const SizedBox(width: 6),
+              _buildSearchChip('Cueca'),
+              const SizedBox(width: 6),
+              _buildSearchChip('Queen'),
+            ],
+          ),
+        ),
+
         if (_searchMsg != null)
           Padding(
-            padding: const EdgeInsets.all(12),
-            child: Text(_searchMsg!,
-                style: const TextStyle(color: Colors.white54)),
+            padding: const EdgeInsets.all(8),
+            child: Text(_searchMsg!, style: const TextStyle(color: Colors.white70, fontSize: 12)),
           ),
+
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
@@ -649,36 +693,26 @@ class _MusicSheetState extends State<MusicSheet> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Solo el DJ: tocar AHORA, saltándose la cola.
-                      if (c.iAmDj)
-                        IconButton(
-                          icon: const Icon(Icons.play_circle_fill,
-                              color: CachoColors.gold),
-                          tooltip: 'Tocar ahora',
-                          onPressed: () {
-                            c.djPlayNow(t);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Sonando ahora: ${t.title}'),
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                          },
-                        ),
+                      // Tocar AHORA
+                      IconButton(
+                        icon: const Icon(Icons.play_circle_fill,
+                            color: CachoColors.gold, size: 22),
+                        tooltip: 'Tocar ahora de fondo',
+                        onPressed: () {
+                          c.djPlayNow(t);
+                          c.lastNotice = 'Sonando: ${t.title}';
+                        },
+                      ),
+                      // Agregar a la cola
                       IconButton(
                         icon: const Icon(Icons.add_circle,
-                            color: CachoColors.gold),
+                            color: Colors.white70, size: 20),
                         tooltip: 'A la cola',
                         onPressed: () {
                           c.addMusic(t);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(c.musicCurrent == null
-                                  ? 'Sonando: ${t.title}'
-                                  : 'A la cola: ${t.title}'),
-                              duration: const Duration(seconds: 2),
-                            ),
-                          );
+                          c.lastNotice = c.musicCurrent == null
+                              ? 'Sonando: ${t.title}'
+                              : 'A la cola: ${t.title}';
                         },
                       ),
                     ],
@@ -688,6 +722,16 @@ class _MusicSheetState extends State<MusicSheet> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSearchChip(String label) {
+    return ActionChip(
+      label: Text(label, style: const TextStyle(fontSize: 11, color: Colors.white)),
+      backgroundColor: const Color(0xFF1E2838),
+      side: const BorderSide(color: Color(0xFF2E3D55), width: 0.8),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+      onPressed: () => _doSearch(label),
     );
   }
 

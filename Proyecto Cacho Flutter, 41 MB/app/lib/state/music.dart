@@ -285,6 +285,11 @@ class MusicService extends ChangeNotifier {
   @override
   void dispose() {
     _timer?.cancel();
+    try {
+      player.pause();
+      player.dispose();
+    } catch (_) {}
+    _setActive(false);
     super.dispose();
   }
 }

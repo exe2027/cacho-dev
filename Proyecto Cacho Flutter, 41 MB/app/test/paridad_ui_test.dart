@@ -54,4 +54,13 @@ void main() {
     expect(c.emoteGlyph, '👏');
     c.dispose();
   });
+
+  test('quick chat: muestra la frase completa con emoji en el globo', () {
+    final c = local();
+    c.startLocal();
+    expect(c.sendQuickChat('😂 ¡Qué risa!'), isTrue);
+    expect(c.emotePlayerId, 'yo');
+    expect(c.emoteGlyph, '😂 ¡Qué risa!');
+    c.dispose();
+  });
 }

@@ -54,6 +54,12 @@
    - Hoja modal interactiva `_showQuickChatSheet` con emotes (`😂`, `👏`, `👍`, `😮`, `🔥`) y frases típicas chilenas de Cacho ("¡Dudo que tengas eso!", "¡Te calzo al tiro!", "Pasa la mano...", etc.).
    - Preservados todos los invariantes de 0 solapes en 6 asientos de `sketch_layout.dart` y `ronda4_mesa_test.dart`.
 
+6. **Fondos Progresivos Dinámicos por Tier y Despliegue a Cloudflare Pages:**
+   - Fondos atmosféricos diferenciados y progresivos para cada sala en el carrusel de apuestas (desde la taberna rústica de madera hasta el club VIP de mármol obsidiana y oro puro).
+   - Despliegue exitoso a producción en Cloudflare Pages: [https://cacho.pages.dev](https://cacho.pages.dev) (Deployment hash `https://6ea79c30.cacho.pages.dev`).
+   - Creado script de compilación y despliegue rápido `deploy_pages.ps1`.
+
+
 ---
 
 ## 3. Lo que se Va a Hacer (Plan de Ejecución)
@@ -86,3 +92,42 @@
 
 1. Presentar al usuario la confirmación del flujo consolidado (Lobby Horizontal estilo Monopoly Poker + Mesa 6 Jugadores estilo `mockup.jpeg` con chat y pozo casino).
 2. Revisar con el usuario el siguiente paso prioritario: integración de Firebase Auth / persistencia en Firestore o cosméticos y animaciones 3D.
+
+
+### Refactorización UI Mesa (2D Isométrica Simétrica y Responsive Layout) - Noviembre 2026
+- **Problema previo:** Desalineación 3D/2D con vasos/avatares flotando, ruptura de aspect ratio con franjas negras en pantallas alargadas y coordenadas absolutas fijas en píxeles.
+- **Arquitectura de 3 Capas implementada:**
+  1. TableBackgroundWidget (pp/lib/widgets/game/table_background_widget.dart): AspectRatio 844:390 + FittedBox.contain, escalado proporcional íntegro de la mesa.
+  2. PlayerSlotWidget y TableGameplaySlotsWidget (pp/lib/widgets/game/player_slot_widget.dart): 6 slots con coordenadas relativas porcentuales al tamaño de mesa obtenido por LayoutBuilder. Encapsula avatar, vaso/cacho, dados y saldo.
+  3. GameHUDWidget (pp/lib/widgets/game/game_hud_widget.dart): Barra superior (pozo, monedas, silencio, salir) y dock inferior (tiles de dados 1-6, botones CALZO, DUDO, PASO, VER/Agitar) sobre SafeArea.
+- **Modularización de Salas:**
+  - RoomConfig (pp/lib/models/room_config.dart) y pp/lib/config/room_configs.dart para los 6 tiers (Tutorial, La Taberna, El Boliche, El Casino, La Mansión, El Club VIP).
+- **Compatibilidad y Verificación:**
+  - 62/62 tests en pp pasando.
+  - 80/80 tests en packages/cacho_engine pasando.
+  - Cero errores en lutter analyze lib/screens/game_screen.dart.
+
+
+### Mesa 2D Cenital (Top-Down) Simétrica Estilo 8 Ball Pool / Monopoly - Noviembre 2026
+- **Problema previo:** Imágenes de fondo con perspectiva 3D (oblicuas) causaban desalineación de avatares y vasos flotando sobre paredes/cortinas.
+- **Mesa 2D Top-Down (Table2DLayoutWidget):**
+  - Riel exterior de madera con radio amplio (forma estadio / superelipse BorderRadius.circular(railHeight * 0.48)).
+  - Bisel dorado y paño de fieltro interior con iluminación cenital radial centrada exactamente en Offset(width/2, height/2).
+  - Color y assets adaptados dinámicamente según RoomConfig por tier.
+- **Sistema de 6 Slots Fijos en Coordenadas Normalizadas (%):**
+  - Slot 0: Jugador Principal (Abajo Centro - 50% X, 85% Y)
+  - Slot 1: Bot 1 (Abajo Izquierda - 18% X, 68% Y)
+  - Slot 2: Bot 2 (Arriba Izquierda - 18% X, 25% Y)
+  - Slot 3: Bot 3 (Arriba Centro - 50% X, 12% Y)
+  - Slot 4: Bot 4 (Arriba Derecha - 82% X, 25% Y)
+  - Slot 5: Bot 5 (Abajo Derecha - 82% X, 68% Y)
+- **Alineación Estricta de Vasos y Avatares (PlayerSlotWidget):**
+  - Mitad inferior (Slots 0, 1, 5): Vaso **ARRIBA** del avatar (hacia el interior del paño).
+  - Mitad superior (Slots 2, 3, 4): Vaso **ABAJO** del avatar (hacia el interior del paño).
+- **Zona Central Limpia:**
+  - Pozo central acumulado con insignia dorada.
+  - Placa de apuesta actual con dado gráfico, cantidad y nombre de jerga chilena.
+- **Validación:**
+  - 62/62 tests pasando en pp.
+  - 80/80 tests pasando en cacho_engine.
+  - lutter build web exitoso y servido en http://localhost:8080.

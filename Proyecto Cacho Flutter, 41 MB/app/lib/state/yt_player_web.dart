@@ -25,6 +25,12 @@ external _CachoYt? get _yt;
 class YtPlayer {
   static YtPlayer? instance;
 
+  static void stopAll() {
+    try {
+      instance?.pause();
+    } catch (_) {}
+  }
+
   YtPlayer() {
     instance = this;
   }
@@ -34,7 +40,10 @@ class YtPlayer {
 
   void markHostMounted() {}
 
-  void dispose() {}
+  void dispose() {
+    pause();
+    if (instance == this) instance = null;
+  }
 
   bool _initTried = false;
 

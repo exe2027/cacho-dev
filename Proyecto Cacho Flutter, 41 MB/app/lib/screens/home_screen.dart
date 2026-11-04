@@ -40,7 +40,8 @@ class _HomeScreenState extends State<HomeScreen>
   // se conserva solo como Listenable del fondo parallax (estático
   // sin scroll: _ParallaxBg lee offset 0 cuando no hay clientes).
   final _homeScroll = ScrollController();
-  static const _realPageCount = 6;
+  bool get _hasTutorial => !_s.guidedDone;
+  int get _realPageCount => _hasTutorial ? 6 : 5;
   final _carouselKey = GlobalKey<_CircularRoomCarouselState>();
   int _carouselIndex = 0; // real index 0..5
   bool? _onlineOk; // null = comprobando
@@ -59,8 +60,11 @@ class _HomeScreenState extends State<HomeScreen>
 
   Settings get _s => Settings.instance;
 
-  String get _name =>
-      _s.nickname.trim().isEmpty ? 'Jugador' : _s.nickname.trim();
+  String get _name {
+    final raw = _s.nickname.trim().isEmpty ? 'Jugador' : _s.nickname.trim();
+    final word = raw.split(RegExp(r'\s+')).first;
+    return word.length > 12 ? word.substring(0, 12) : word;
+  }
 
   Color get _leather =>
       CachoColors.leatherChoices.values.elementAt(_s.leatherIndex);
@@ -102,7 +106,10 @@ class _HomeScreenState extends State<HomeScreen>
   /// inicio no se recrea: sin este re-chequeo el aviso de sala
   /// activa jamás aparecía).
   @override
-  void didPopNext() => _checkActiveRoom();
+  void didPopNext() {
+    _checkActiveRoom();
+    if (mounted) setState(() {});
+  }
 
   /// Volvió a la app desde otra aplicación o segundo plano.
   @override
@@ -212,7 +219,12 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _refresh() {
-    if (mounted) setState(() {});
+    if (mounted) {
+      if (_carouselIndex >= _realPageCount) {
+        _carouselIndex = 0;
+      }
+      setState(() {});
+    }
   }
 
   Future<void> _probe() async {
@@ -247,6 +259,12 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _playGuided() async {
+    if (_s.guidedDone) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ya completaste el tutorial guiado.')),
+      );
+      return;
+    }
     // M2: aviso de giro fuera de partida (la guiada va directa a
     // la mesa, sin hoja intermedia).
     if (!await RotateNotice.confirmIfPortrait(context)) return;
@@ -618,7 +636,10 @@ class _HomeScreenState extends State<HomeScreen>
                     children: [
                       // Barra superior casino estilo Monopoly Poker
                       _buildTopBar(),
-                      if (_activeCode != null) _activeRoomBanner(),
+                      if (MatchController.activeSession != null && !MatchController.activeSession!.isGameOver)
+                        _activeSessionBanner(MatchController.activeSession!)
+                      else if (_activeCode != null)
+                        _activeRoomBanner(),
                       // Carrusel horizontal de mesas (tiers)
                       Expanded(
                         child: _buildCarouselSection(),
@@ -864,8 +885,9 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  /// Navigate the circular carousel to the given real index (0..5).
+  /// Navigate the circular carousel to the given real index (0.._realPageCount-1).
   void _goToRealPage(int realIndex) {
+    if (realIndex < 0 || realIndex >= _realPageCount) return;
     _carouselKey.currentState?.goTo(realIndex);
   }
 
@@ -876,7 +898,7 @@ class _HomeScreenState extends State<HomeScreen>
           child: _CircularRoomCarousel(
             key: _carouselKey,
             itemCount: _realPageCount,
-            initialIndex: _carouselIndex,
+            initialIndex: _carouselIndex >= _realPageCount ? 0 : _carouselIndex,
             onIndexChanged: (newIdx) {
               setState(() => _carouselIndex = newIdx);
             },
@@ -914,7 +936,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildLobbyCard(int index, {bool isSelected = false}) {
-    if (index == 0) {
+    if (_hasTutorial && index == 0) {
       // ──────────────────────────────────────────────────────
       // Tarjeta 0: TU PRIMERA PARTIDA GUIADA (Tutorial)
       // Academia de Cacho · Paleta clásica pizarra/teal (NO NEÓN)
@@ -1139,8 +1161,9 @@ class _HomeScreenState extends State<HomeScreen>
     //   4 = La Mansión (lujoso, borgoña/rubí, alta tensión)
     //   5 = El Club VIP (exclusivo, ónix negro, champagne/platino)
     // ──────────────────────────────────────────────────────
+    final tierIndex = _hasTutorial ? index - 1 : index;
     final tierStakes = [100, 250, 500, 1000, 2500];
-    final stake = tierStakes[index - 1];
+    final stake = tierStakes[tierIndex];
     final tierNames = [
       'LA TABERNA',
       'EL BOLICHE',
@@ -1184,6 +1207,13 @@ class _HomeScreenState extends State<HomeScreen>
       'assets/images/bg_mansion.jpg',
       'assets/images/bg_clubvip.jpg',
     ];
+    final tierTables = [
+      'assets/images/mesa_2d_taberna.png',
+      'assets/images/mesa_2d_boliche.png',
+      'assets/images/mesa_2d_casino.png',
+      'assets/images/mesa_2d_mansion.png',
+      'assets/images/mesa_2d_vip.png',
+    ];
     // Tier icon (progressing elegance)
     final tierIcons = [
       Icons.sports_bar,        // tavern: beer mug
@@ -1193,16 +1223,17 @@ class _HomeScreenState extends State<HomeScreen>
       Icons.workspace_premium, // vip: royal crown
     ];
 
-    final name = tierNames[index - 1];
-    final sub = tierSubtitles[index - 1];
-    final color = tierAccent[index - 1];
-    final sprite = tierSprites[index - 1];
-    final gradTop = tierGradientTop[index - 1];
-    final gradBot = tierGradientBot[index - 1];
-    final tierIcon = tierIcons[index - 1];
+    final name = tierNames[tierIndex];
+    final sub = tierSubtitles[tierIndex];
+    final color = tierAccent[tierIndex];
+    final sprite = tierSprites[tierIndex];
+    final gradTop = tierGradientTop[tierIndex];
+    final gradBot = tierGradientBot[tierIndex];
+    final tierIcon = tierIcons[tierIndex];
+    final tableAsset = tierTables[tierIndex];
     final affords = Wallet.instance.balance >= stake;
     final pot = stake * 6; // 6 jugadores en mesa completa
-    final theme = index == 1 ? tableThemePub : defaultTableTheme;
+    final theme = tierIndex == 0 ? tableThemePub : defaultTableTheme;
 
     return Container(
       decoration: BoxDecoration(
@@ -1333,7 +1364,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 ),
                                 const SizedBox(width: 4),
                               ],
-                              if (index == 5) ...[
+                              if (tierIndex == 4) ...[
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 6, vertical: 2),
@@ -1397,24 +1428,31 @@ class _HomeScreenState extends State<HomeScreen>
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              // Vista Previa de la Mesa 2D Fotorrealista de la Sala
                               Container(
-                                width: emblemSize,
-                                height: emblemSize,
+                                constraints: BoxConstraints(
+                                  maxWidth: compact ? 115 : 145,
+                                  maxHeight: compact ? 44 : 54,
+                                ),
                                 decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: color.withValues(alpha: 0.16),
-                                  border: Border.all(
-                                    color: color.withValues(alpha: 0.65),
-                                    width: 2,
-                                  ),
+                                  borderRadius: BorderRadius.circular(8),
                                   boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.65),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
                                     BoxShadow(
                                       color: color.withValues(alpha: 0.25),
                                       blurRadius: 10,
                                     ),
                                   ],
                                 ),
-                                child: Icon(tierIcon, size: eIconSize, color: color),
+                                child: Image.asset(
+                                  tableAsset,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => Icon(tierIcon, size: eIconSize, color: color),
+                                ),
                               ),
                               const SizedBox(height: 3),
                               FittedBox(
@@ -1517,9 +1555,9 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                         ),
                       ),
-                      // index == 1 tiene 'JUGAR CONTRA LA MÁQUINA' para satisfacer widget_test
+                      // tierIndex == 0 (La Taberna) tiene 'JUGAR CONTRA LA MÁQUINA' para satisfacer widget_test
                       BronzeButton(
-                        label: index == 1
+                        label: tierIndex == 0
                             ? 'JUGAR CONTRA LA MÁQUINA'
                             : 'JUGAR AHORA',
                         icon: affords ? Icons.play_arrow : Icons.lock,
@@ -1533,9 +1571,9 @@ class _HomeScreenState extends State<HomeScreen>
                         onPressed: affords
                             ? () => _playLocal(
                                   bots: 5,
-                                  difficulty: index <= 2
+                                  difficulty: tierIndex <= 1
                                       ? 'facil'
-                                      : (index <= 4 ? 'media' : 'dificil'),
+                                      : (tierIndex <= 3 ? 'media' : 'dificil'),
                                   stake: stake,
                                   tableTheme: theme,
                                   preset: _preset,
@@ -1826,6 +1864,115 @@ class _HomeScreenState extends State<HomeScreen>
   /// HORIZONTAL): una sola fila — código, detalle corto, botón
   /// Entrar (44 px) y descartar (44 px) — para que la columna
   /// izquierda quepa también con sala activa sin scroll.
+  Widget _activeSessionBanner(MatchController session) {
+    final isOnline = session.online;
+    final title = isOnline && session.roomCode != null
+        ? 'SALA ACTIVA · ${session.roomCode}'
+        : 'PARTIDA EN CURSO';
+    final subtitle = 'Ronda ${session.round} · ${session.players.length} jugadores · Te saliste de la mesa';
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xF2121D2F),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: CachoColors.gold, width: 1.6),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x40D4AF37),
+            blurRadius: 10,
+            spreadRadius: 1,
+          ),
+          BoxShadow(
+            color: Colors.black54,
+            blurRadius: 8,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: CachoColors.gold.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.play_arrow_rounded, color: CachoColors.gold, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: CachoFonts.display,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    color: CachoColors.gold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          FilledButton.icon(
+            onPressed: () {
+              session.resumeTimers();
+              pushMenuPage(
+                context,
+                builder: (_) => GameScreen(
+                  controller: session,
+                  leather: _leather,
+                  cupEntry: false,
+                ),
+              );
+            },
+            icon: const Icon(Icons.login, size: 16),
+            label: const Text('VOLVER A ENTRAR', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
+            style: FilledButton.styleFrom(
+              backgroundColor: CachoColors.gold,
+              foregroundColor: Colors.black,
+              minimumSize: const Size(0, 38),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+          const SizedBox(width: 6),
+          IconButton(
+            onPressed: () {
+              if (session.guided) {
+                _s.markGuidedDone();
+              }
+              session.dispose();
+              MatchController.activeSession = null;
+              setState(() {});
+            },
+            icon: const Icon(Icons.close, size: 20),
+            color: Colors.white54,
+            tooltip: 'Abandonar partida',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _activeRoomBanner() {
     final detail = _activePhase == 'playing'
         ? 'Partida en curso · tu asiento te espera'
@@ -2153,6 +2300,14 @@ class _CircularRoomCarouselState extends State<_CircularRoomCarousel>
   void dispose() {
     _animCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CircularRoomCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.itemCount > 0 && _currentIndex >= widget.itemCount) {
+      _currentIndex = _currentIndex % widget.itemCount;
+    }
   }
 
   void next() {

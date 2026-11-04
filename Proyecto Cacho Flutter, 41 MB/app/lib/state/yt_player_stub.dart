@@ -6,6 +6,12 @@ import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 class YtPlayer {
   static YtPlayer? instance;
 
+  static void stopAll() {
+    try {
+      instance?.pause();
+    } catch (_) {}
+  }
+
   YtPlayer() {
     instance = this;
   }
@@ -26,5 +32,7 @@ class YtPlayer {
   double get currentTime => -1;
   int get state => -99;
   bool consumeEnded() => false;
-  void dispose() {}
+  void dispose() {
+    if (instance == this) instance = null;
+  }
 }
