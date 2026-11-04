@@ -41,20 +41,26 @@ void main() {
     });
 
     test('CupSkinModel presets and getById', () {
-      expect(CupSkinModel.allSkins.length, 4);
-      expect(CupSkinModel.getById('cup_standard').name, 'Vaso Estándar');
-      expect(CupSkinModel.getById('cup_roble').priceCash, 150);
-      expect(CupSkinModel.getById('cup_dorado').isAnimated, true);
+      expect(CupSkinModel.allSkins.length, 7);
+      expect(CupSkinModel.getById('cup_standard').name, 'Cacho de Cuero Clásico');
+      expect(CupSkinModel.getById('cup_chifle').shapeType, CupShapeType.chifle);
+      expect(CupSkinModel.getById('cup_roble').priceCash, 180);
+      expect(CupSkinModel.getById('cup_dorado').shapeType, CupShapeType.goblet);
       expect(CupSkinModel.getById('cup_fuego').priceCash, 500);
+      expect(CupSkinModel.getById('cup_cyber').shapeType, CupShapeType.cyberPrism);
+      expect(CupSkinModel.getById('cup_glaciar').shapeType, CupShapeType.crystalFrost);
       expect(CupSkinModel.getById('unknown').id, CupSkinModel.standard.id);
     });
 
     test('AvatarFrameModel presets and getById', () {
-      expect(AvatarFrameModel.allFrames.length, 4);
+      expect(AvatarFrameModel.allFrames.length, 7);
       expect(AvatarFrameModel.getById('frame_none').name, 'Sin Marco');
       expect(AvatarFrameModel.getById('frame_oro').effectType, 'gold');
       expect(AvatarFrameModel.getById('frame_neon').effectType, 'neon');
       expect(AvatarFrameModel.getById('frame_fuego').effectType, 'fire');
+      expect(AvatarFrameModel.getById('frame_frost').effectType, 'frost');
+      expect(AvatarFrameModel.getById('frame_galaxy').effectType, 'galaxy');
+      expect(AvatarFrameModel.getById('frame_valhalla').effectType, 'valhalla');
       expect(AvatarFrameModel.getById('unknown').id, AvatarFrameModel.none.id);
     });
 
@@ -124,14 +130,14 @@ void main() {
       s.updateProfile(s.user.copyWith(cash: 400));
 
       final shop = ShopController(service: s);
-      final roble = CupSkinModel.roble; // Cost 150 Cash
+      final roble = CupSkinModel.roble; // Cost 180 Cash
 
       // Primera vez: comprar y equipar
       final bought = shop.buyOrEquipCupSkin(roble);
       expect(bought, true);
       expect(s.user.ownedCupSkinIds.contains(roble.id), true);
       expect(s.user.equippedCupSkinId, roble.id);
-      expect(s.user.cash, 250); // 400 - 150
+      expect(s.user.cash, 220); // 400 - 180
 
       // Re-equipar el estándar
       shop.buyOrEquipCupSkin(CupSkinModel.standard);
@@ -140,7 +146,7 @@ void main() {
       // Equipar roble sin costo adicional
       shop.buyOrEquipCupSkin(roble);
       expect(s.user.equippedCupSkinId, roble.id);
-      expect(s.user.cash, 250); // Mismo saldo
+      expect(s.user.cash, 220); // Mismo saldo
     });
 
     test('Buy and equip avatar frames', () async {

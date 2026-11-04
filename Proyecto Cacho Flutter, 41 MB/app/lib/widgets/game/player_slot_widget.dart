@@ -578,11 +578,11 @@ class _PlayerSlotWidgetState extends State<PlayerSlotWidget>
       animation: _cupLiftAnim,
       builder: (context, child) {
         final lift = _cupLiftAnim.value;
-        // Se eleva 14px y se inclina -18 grados al destapar
+        // Se eleva 18px y se inclina -18 grados al destapar
         return Transform(
           alignment: Alignment.bottomCenter,
           transform: Matrix4.identity()
-            ..translate(0.0, -14.0 * lift)
+            ..translate(0.0, -18.0 * lift)
             ..rotateZ(-0.25 * lift),
           child: child,
         );
@@ -595,11 +595,11 @@ class _PlayerSlotWidgetState extends State<PlayerSlotWidget>
             alignment: Alignment.center,
             clipBehavior: Clip.none,
             children: [
-              // Imagen y efectos visuales animados de la skin del vaso
+              // Imagen y efectos visuales animados de la skin del vaso (más grande para destacar detalles)
               AnimatedCupVisual(
                 skin: cupSkin,
-                width: 30,
-                height: 32,
+                width: widget.isLocalUser ? 48 : 42,
+                height: widget.isLocalUser ? 52 : 46,
               ),
 
               // Puntos indicadores de dados restantes cuando está cerrado

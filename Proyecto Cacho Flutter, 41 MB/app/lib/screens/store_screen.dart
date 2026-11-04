@@ -663,8 +663,8 @@ class _StoreScreenState extends State<StoreScreen>
         children: [
           // Vista previa del vaso con animación viva de la skin
           Container(
-            width: 62,
-            height: 62,
+            width: 70,
+            height: 70,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -672,19 +672,19 @@ class _StoreScreenState extends State<StoreScreen>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: skin.glowColor, width: 1.4),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: skin.glowColor, width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: skin.glowColor.withValues(alpha: 0.35),
-                  blurRadius: 8,
+                  color: skin.glowColor.withValues(alpha: 0.4),
+                  blurRadius: 10,
                 ),
               ],
             ),
             child: AnimatedCupVisual(
               skin: skin,
-              width: 36,
-              height: 38,
+              width: 46,
+              height: 50,
             ),
           ),
           const SizedBox(width: 14),
