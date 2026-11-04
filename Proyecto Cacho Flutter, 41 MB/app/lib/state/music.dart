@@ -198,6 +198,17 @@ class MusicService extends ChangeNotifier {
     player.play();
   }
 
+  /// Aplica el volumen efectivo de inmediato al reproductor (ducking instantáneo o restauración)
+  void syncVolume() {
+    final eff = effectiveVolume;
+    if (eff != _lastAppliedVolume || _volTrack != _loadedId) {
+      player.setVolume(eff);
+      _lastAppliedVolume = eff;
+      _volTrack = _loadedId;
+      notifyListeners();
+    }
+  }
+
   /// Ceba el reproductor DENTRO del gesto del jugador (toca
   /// "agregar" o "tocar ahora" en la hoja): en iOS el navegador solo
   /// deja sonar con volumen un reproductor que nació de un toque, y

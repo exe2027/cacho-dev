@@ -185,45 +185,57 @@ class UiResolution {
       );
 }
 
-// Banco de nombres de bots y jugadores: SOLO UNA PALABRA, MÁXIMO 12 CARACTERES
+// Banco de nombres de bots: NICKNAMES Y GAMERTAGS DE JUEGO EN LÍNEA (Sin nombres de personas reales)
 const _botNames = [
-  'Chalo',
-  'Cuca',
-  'Guaton',
-  'Pituca',
-  'Huaso',
-  'Mateo',
-  'Sofi',
-  'Nacho',
-  'Cata',
-  'Lucho',
-  'Pancho',
-  'Checho',
-  'Tito',
-  'Diego',
-  'Vale',
-  'Mati',
-  'Javi',
-  'Fran',
-  'Benja',
-  'Isi',
-  'Lucas',
-  'Pato',
-  'Camila',
-  'Rodrigo',
-  'Martina',
-  'Vicente',
-  'Tomas',
-  'Agustin',
-  'Maxi',
-  'Pepe',
+  'xX_Shadow_Xx',
+  'CyberWolf_77',
+  'K1ng_Player',
+  'x_DarkViper_x',
+  'Lobo_21',
+  'Pro_Gamer99',
+  'NeonRider_26',
+  'Sn1p3r_Dice',
+  'Ghost_88',
+  'Master_007',
+  'El_Matad0r',
+  'B0tt_Smash3r',
+  'PokerFace_99',
+  'Dark_K1ng',
+  'Zero_Cool_99',
+  'TitanDice_404',
+  'Th3_B0ss',
+  'Viper_Pro',
+  'IronDudo_12',
+  'V01d_Walk3r',
+  'Quantum_42',
+  'Alpha_Strike',
+  'ShadowFox_09',
+  'Dark-Specter',
+  'L3g3nd_Dudo',
+  'Apex_01',
+  'Neo_Matrix_88',
+  'xX_Slayer_Xx',
+  'GoldHunter777',
+  'Phantom_Dice',
+  'Cr4zy_D1ce',
+  'OmegaDice_88',
+  'Steel_Titan',
+  'St0rm_R1der',
+  'Falcon_99',
+  'UltraInstinct',
+  'Bl4ck_Lotus',
+  'Valkyrie_13',
+  'Rogue_77',
+  'Pwn3r_99',
+  'DragonFury_07',
+  'Delta_Force',
 ];
 
 String cleanSingleWordName(String raw) {
   final trimmed = raw.trim();
   if (trimmed.isEmpty) return 'Jugador';
   final first = trimmed.split(RegExp(r'\s+')).first;
-  return first.length > 12 ? first.substring(0, 12) : first;
+  return first.length > 16 ? first.substring(0, 16) : first;
 }
 
 /// Controlador de una partida: la misma pantalla sirve para el modo local
@@ -414,11 +426,13 @@ class MatchController extends ChangeNotifier {
   int get musicSkipNeeded => _music?.skipNeeded ?? 2;
   bool get iAmDj => _music != null && _music!.djId == myId;
 
+  bool get anyMicOpen =>
+      myMicOn || _micById.values.any((v) => v) || players.any((p) => p.micOn);
+
   void _ensureMusic() {
     if (_music != null) return;
     final svc = MusicService();
-    svc.anyMicOn = () =>
-        myMicOn || _micById.values.any((v) => v) || players.any((p) => p.micOn);
+    svc.anyMicOn = () => anyMicOpen;
     svc.onEnded = () {
       if (online) {
         _send({'type': 'music_ended'});
@@ -720,6 +734,7 @@ class MatchController extends ChangeNotifier {
     bool guided = false,
     int stake = 0,
     String tableTheme = defaultTableTheme,
+    List<String>? customBotNames,
   }) {
     final c = MatchController._(
       online: false,
@@ -741,11 +756,16 @@ class MatchController extends ChangeNotifier {
       (id: 'yo', name: cleanUser),
     ];
 
-    // Emparejar con bots aleatorios únicos (1 palabra, max 12 chars)
+    // Emparejar con contrincantes asignados o aleatorios únicos
     final rng = Random();
-    final availableBots = List<String>.from(_botNames)..shuffle(rng);
-    availableBots.removeWhere((b) => b.toLowerCase() == cleanUser.toLowerCase());
-    final chosenBots = availableBots.take(botCount).toList();
+    final List<String> chosenBots;
+    if (customBotNames != null && customBotNames.length >= botCount) {
+      chosenBots = customBotNames.take(botCount).toList();
+    } else {
+      final availableBots = List<String>.from(_botNames)..shuffle(rng);
+      availableBots.removeWhere((b) => b.toLowerCase() == cleanUser.toLowerCase());
+      chosenBots = availableBots.take(botCount).toList();
+    }
 
     for (var i = 0; i < botCount; i++) {
       final id = 'bot${i + 1}';
@@ -981,23 +1001,37 @@ class MatchController extends ChangeNotifier {
 
   final Set<String> _voicePeers = {};
 
-  /// Mi micrófono: pide permiso la primera vez; avisa por el
+  /// Mi micrófono: pide permiso la primera vez (en línea); avisa por el
   /// servidor para que el icono se encienda en todas las mesas.
+  /// En partidas locales o sin WebRTC alterna el estado local y activa
+  /// el ducking de la rocola inmediatamente.
   Future<void> toggleMic() async {
     final v = _voice;
-    if (v == null) return;
-    final next = !myMicOn;
-    final ok = await v.setMic(next);
-    if (!ok) {
-      notifyListeners();
-      return;
+    if (v != null) {
+      final next = !myMicOn;
+      final ok = await v.setMic(next);
+      if (!ok) {
+        notifyListeners();
+        return;
+      }
+      myMicOn = next;
+      _micById[myId] = next;
+      _send({'type': 'mic', 'on': next});
+      players = [
+        for (final p in players) p.id == myId ? p.copyWith(micOn: next) : p,
+      ];
+    } else {
+      myMicOn = !myMicOn;
+      _micById[myId] = myMicOn;
     }
-    myMicOn = next;
-    _micById[myId] = next;
-    _send({'type': 'mic', 'on': next});
-    players = [
-      for (final p in players) p.id == myId ? p.copyWith(micOn: next) : p,
-    ];
+    _music?.syncVolume();
+    notifyListeners();
+  }
+
+  void setLocalMic(bool on) {
+    myMicOn = on;
+    _micById[myId] = on;
+    _music?.syncVolume();
     notifyListeners();
   }
 
@@ -1186,6 +1220,8 @@ class MatchController extends ChangeNotifier {
             for (final p in players)
               p.id == pid ? p.copyWith(micOn: _micById[pid]) : p,
           ];
+          _music?.syncVolume();
+          notifyListeners();
         }
       case 'voice_signal':
         final from = m['from'] as String?;

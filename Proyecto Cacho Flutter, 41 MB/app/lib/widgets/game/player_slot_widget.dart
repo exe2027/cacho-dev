@@ -62,6 +62,8 @@ class PlayerSlotWidget extends StatefulWidget {
   final int slotIndex; // 0 a 5
   final VoidCallback? onTapCup;
   final String? activeEmote;
+  final bool? micOn;
+  final VoidCallback? onToggleMic;
 
   const PlayerSlotWidget({
     super.key,
@@ -80,6 +82,8 @@ class PlayerSlotWidget extends StatefulWidget {
     required this.slotIndex,
     this.onTapCup,
     this.activeEmote,
+    this.micOn,
+    this.onToggleMic,
   });
 
   @override
@@ -492,6 +496,20 @@ class _PlayerSlotWidgetState extends State<PlayerSlotWidget>
                 size: 16,
               ),
             ),
+
+            // Insignia de Micrófono superpuesta en la parte superior del avatar
+            if (widget.micOn != null)
+              Positioned(
+                top: -8,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: MicBadge(
+                    on: widget.micOn!,
+                    onTap: widget.onToggleMic,
+                  ),
+                ),
+              ),
           ],
         );
       },
@@ -867,6 +885,9 @@ class TableGameplaySlotsWidget extends StatelessWidget {
           roomConfig: data.roomConfig,
           slotIndex: index,
           onTapCup: data.onTapCup,
+          activeEmote: data.activeEmote,
+          micOn: data.micOn,
+          onToggleMic: data.onToggleMic,
         ),
       ),
     );
@@ -891,6 +912,8 @@ class PlayerSlotData {
   final RoomConfig roomConfig;
   final VoidCallback? onTapCup;
   final String? activeEmote;
+  final bool? micOn;
+  final VoidCallback? onToggleMic;
 
   const PlayerSlotData({
     required this.targetSlotIndex,
@@ -909,5 +932,7 @@ class PlayerSlotData {
     required this.roomConfig,
     this.onTapCup,
     this.activeEmote,
+    this.micOn,
+    this.onToggleMic,
   });
 }

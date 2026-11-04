@@ -69,7 +69,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   late final AnimationController _squashCtrl;
   // AN6: cortina de apertura (solo desde el lobby).
   bool _showEntryCurtain = false;
-  bool _localMicOn = false;
   // AN16: vaso que se posa, una sola vez por sesión.
   static bool _cupEntryPlayed = false;
   late final AnimationController _entryCtrl;
@@ -946,6 +945,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   setState(() => AudioService.instance.enabled = !AudioService.instance.enabled);
                   AudioService.instance.syncAmbience();
                 },
+                isMicOn: c.myMicOn,
+                onToggleMic: _handleToggleMic,
                 onOpenMusic: () => showMusicSheet(context, c),
                 onExit: _exit,
                 roomSubtitle:
@@ -1143,6 +1144,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     c.doPaso();
   }
 
+  void _handleToggleMic() {
+    c.toggleMic();
+    setState(() {});
+    _showCenterNotice(c.myMicOn ? 'Micrófono activado' : 'Micrófono silenciado');
+  }
+
   List<PlayerSlotData> _buildTableSlotsData(
       List<PlayerView> others, RoomConfig roomConfig) {
     final List<PlayerSlotData> list = [];
@@ -1167,6 +1174,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         roomConfig: roomConfig,
         onTapCup: () => setState(_toggleEye),
         activeEmote: c.emotePlayerId == c.myId ? c.emoteGlyph : null,
+        micOn: c.myMicOn,
+        onToggleMic: _handleToggleMic,
       ),
     );
 
@@ -1211,6 +1220,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           roomConfig: roomConfig,
           onTapCup: null,
           activeEmote: c.emotePlayerId == p.id ? c.emoteGlyph : null,
+          micOn: c.online ? p.micOn : null,
+          onToggleMic: null,
         ),
       );
     }
@@ -1596,7 +1607,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     /// el avatar sigue siendo el indicador de estado (solo en
     /// línea), no un segundo control.
     Widget micButton(double size) {
-      final on = c.online ? c.myMicOn : _localMicOn;
+      final on = c.myMicOn;
       return SizedBox(
         width: size,
         height: size,
@@ -1607,14 +1618,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           shape: const CircleBorder(),
           child: InkWell(
             customBorder: const CircleBorder(),
-            onTap: () {
-              if (c.online) {
-                c.toggleMic();
-              } else {
-                setState(() => _localMicOn = !_localMicOn);
-                _showCenterNotice(_localMicOn ? 'Micrófono activado' : 'Micrófono silenciado');
-              }
-            },
+            onTap: _handleToggleMic,
             child: Tooltip(
               message: on ? 'Silenciar micrófono' : 'Activar micrófono',
               child: Icon(

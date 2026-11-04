@@ -47,6 +47,8 @@ class GameHUDWidget extends StatelessWidget {
   final bool isCupOpen;
   final VoidCallback? onToggleCup;
   final VoidCallback? onOpenMusic;
+  final bool isMicOn;
+  final VoidCallback? onToggleMic;
 
   // Banners adicionales opcionales (Kamikaze, Paso)
   final Widget? bannerNotification;
@@ -62,6 +64,8 @@ class GameHUDWidget extends StatelessWidget {
     required this.onExit,
     this.roomSubtitle,
     this.showPotInTopBar = false,
+    this.isMicOn = false,
+    this.onToggleMic,
     required this.isMyTurn,
     this.activeTurnName,
     this.currentBid,
@@ -128,7 +132,7 @@ class GameHUDWidget extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 1. Extremo Izquierdo: Salir + Audio
+          // 1. Extremo Izquierdo: Salir + Audio + Mic + Rocola
           _buildTopIconButton(
             icon: Icons.arrow_back_ios_new,
             label: 'SALIR',
@@ -139,6 +143,18 @@ class GameHUDWidget extends StatelessWidget {
             icon: isAudioMuted ? Icons.volume_off : Icons.volume_up,
             onTap: onToggleAudio,
           ),
+          if (onToggleMic != null) ...[
+            const SizedBox(width: 5),
+            _buildTopIconButton(
+              icon: isMicOn ? Icons.mic : Icons.mic_off,
+              label: isMicOn ? 'MIC' : null,
+              iconColor: isMicOn ? const Color(0xFF35D461) : Colors.white70,
+              backgroundColor: isMicOn
+                  ? const Color(0xFF14532D).withValues(alpha: 0.90)
+                  : const Color(0xFF1B2434).withValues(alpha: 0.85),
+              onTap: onToggleMic!,
+            ),
+          ],
           if (onOpenMusic != null) ...[
             const SizedBox(width: 5),
             _buildTopIconButton(
@@ -322,9 +338,12 @@ class GameHUDWidget extends StatelessWidget {
     required IconData icon,
     String? label,
     required VoidCallback onTap,
+    Color? iconColor,
+    Color? backgroundColor,
+    Color? textColor,
   }) {
     return Material(
-      color: const Color(0xFF1B2434).withValues(alpha: 0.85),
+      color: backgroundColor ?? const Color(0xFF1B2434).withValues(alpha: 0.85),
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
@@ -337,15 +356,15 @@ class GameHUDWidget extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 14, color: Colors.white),
+              Icon(icon, size: 14, color: iconColor ?? Colors.white),
               if (label != null) ...[
                 const SizedBox(width: 4),
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: textColor ?? Colors.white,
                   ),
                 ),
               ],

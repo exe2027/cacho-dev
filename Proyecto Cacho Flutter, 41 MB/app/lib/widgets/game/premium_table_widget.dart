@@ -186,6 +186,8 @@ class PremiumTableWidget extends StatelessWidget {
           slotIndex: index,
           onTapCup: data.onTapCup,
           activeEmote: data.activeEmote,
+          micOn: data.micOn,
+          onToggleMic: data.onToggleMic,
         ),
       ),
     );

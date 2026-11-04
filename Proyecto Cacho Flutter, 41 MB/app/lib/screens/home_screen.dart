@@ -20,6 +20,8 @@ import '../widgets/rotate_notice.dart';
 import '../widgets/coin_widgets.dart';
 import '../services/user_service.dart';
 import '../widgets/game/star_level_badge.dart';
+import '../config/room_configs.dart';
+import '../widgets/game/matchmaking_overlay.dart';
 import 'buscar_salas_screen.dart';
 import 'game_screen.dart';
 import 'how_to_play_screen.dart';
@@ -239,15 +241,55 @@ class _HomeScreenState extends State<HomeScreen>
 
   // ---------------- partidas ----------------
 
-  void _playLocal(
-      {required int bots,
-      required String difficulty,
-      int stake = 0,
-      String tableTheme = defaultTableTheme,
-      String? preset}) async {
+  void _playLocal({
+    required int bots,
+    required String difficulty,
+    int stake = 0,
+    String tableTheme = defaultTableTheme,
+    String? preset,
+    bool skipMatchmaking = false,
+  }) async {
     if (!await RotateNotice.confirmIfPortrait(context)) return;
     if (!mounted) return;
     if (preset != null) _preset = preset;
+
+    // Desplegar modal de Matchmaking estilo 8 Ball Pool para partidas con contrincantes
+    if (!skipMatchmaking && bots >= 2) {
+      final roomConfig = getRoomConfigByStake(stake);
+      MatchmakingOverlay.show(
+        context: context,
+        roomConfig: roomConfig,
+        stake: stake,
+        onMatched: (opponents) {
+          if (!mounted) return;
+          final customNames = opponents.map((b) => b.username).toList();
+          _launchLocalMatch(
+            bots: bots,
+            difficulty: difficulty,
+            stake: stake,
+            tableTheme: tableTheme,
+            customBotNames: customNames,
+          );
+        },
+      );
+      return;
+    }
+
+    _launchLocalMatch(
+      bots: bots,
+      difficulty: difficulty,
+      stake: stake,
+      tableTheme: tableTheme,
+    );
+  }
+
+  void _launchLocalMatch({
+    required int bots,
+    required String difficulty,
+    int stake = 0,
+    String tableTheme = defaultTableTheme,
+    List<String>? customBotNames,
+  }) {
     final c = MatchController.local(
       nickname: _name,
       botCount: bots,
@@ -255,6 +297,7 @@ class _HomeScreenState extends State<HomeScreen>
       config: _config,
       stake: stake,
       tableTheme: tableTheme,
+      customBotNames: customBotNames,
     );
     c.startLocal();
     pushMenuPage(
