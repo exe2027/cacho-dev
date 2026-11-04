@@ -447,7 +447,7 @@ class _PlayerSlotWidgetState extends State<PlayerSlotWidget>
                 ),
               ),
 
-            // Indicador de turno: Anillo temporizador con resplandor dorado
+            // Indicador de turno: Anillo temporizador con semáforo (verde → amarillo → rojo)
             if (widget.isTurn && widget.turnProgress != null)
               SizedBox(
                 width: 46,
@@ -455,8 +455,10 @@ class _PlayerSlotWidgetState extends State<PlayerSlotWidget>
                 child: CircularProgressIndicator(
                   value: widget.turnProgress,
                   strokeWidth: 3.5,
-                  valueColor: AlwaysStoppedAnimation<Color>(widget.roomConfig.accentColor),
-                  backgroundColor: widget.roomConfig.accentColor.withValues(alpha: 0.2),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    ringTimeColor(widget.turnProgress!),
+                  ),
+                  backgroundColor: ringTimeColor(widget.turnProgress!).withValues(alpha: 0.2),
                 ),
               ),
 

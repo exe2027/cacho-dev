@@ -1217,9 +1217,9 @@ Color ringTimeColor(double fraction) {
   return CachoColors.casinoRed;
 }
 
-/// Segundos en los que suena el pitido de apuro en mi turno: los últimos
-/// tres segundos (ya en rojo), un pitido por segundo.
-bool isBeepSecond(int secondsLeft) => secondsLeft >= 1 && secondsLeft <= 3;
+/// Segundos en los que suena el pitido de apuro en mi turno: cuando el
+/// semáforo pasa a rojo (15 s), pita 3 veces (15, 14, 13).
+bool isBeepSecond(int secondsLeft) => secondsLeft >= 13 && secondsLeft <= 15;
 
 /// Color del círculo del avatar: en su turno, el semáforo del tiempo
 /// (el círculo entero —borde y brillo— toma el color, para que el estado

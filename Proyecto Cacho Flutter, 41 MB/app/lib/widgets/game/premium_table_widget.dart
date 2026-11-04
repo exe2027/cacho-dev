@@ -87,12 +87,17 @@ class _PremiumTableWidgetState extends State<PremiumTableWidget>
   /// Timer que dispara el fade-out 4 segundos después de aparecer el chip.
   Timer? _dismissTimer;
 
-  /// Última apuesta procesada (para detectar cambios).
-  Bid? _prevBid;
+  /// Clave de la última apuesta mostrada (evita re-disparar por reconstrucción).
+  String? _shownBidKey;
+
+  /// Genera una clave única para una Bid (null → cadena vacía).
+  String _keyOf(Bid? bid, String? bidder) =>
+      bid == null ? '' : '${bid.quantity}x${bid.face}@${bidder ?? ''}';
 
   @override
   void initState() {
     super.initState();
+    _shownBidKey = _keyOf(widget.currentBid, widget.lastBidderName);
     if (widget.currentBid != null) {
       _bidAnim.value = 1.0;
       _scheduleDismiss();
@@ -102,19 +107,19 @@ class _PremiumTableWidgetState extends State<PremiumTableWidget>
   @override
   void didUpdateWidget(PremiumTableWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final newBid = widget.currentBid;
-    if (newBid != _prevBid) {
-      _prevBid = newBid;
-      if (newBid != null) {
-        // Nueva apuesta: cancelar timer anterior, animar entrada y programar salida
-        _dismissTimer?.cancel();
-        _bidAnim.forward(from: 0.0);
-        _scheduleDismiss();
-      } else {
-        // Sin apuesta: fade-out inmediato
-        _dismissTimer?.cancel();
-        _bidAnim.reverse();
-      }
+    final newKey = _keyOf(widget.currentBid, widget.lastBidderName);
+    if (newKey == _shownBidKey) return; // misma apuesta, nada que hacer
+    _shownBidKey = newKey;
+
+    if (widget.currentBid != null) {
+      // Nueva apuesta: cancelar timer anterior, animar entrada y programar salida
+      _dismissTimer?.cancel();
+      _bidAnim.forward(from: 0.0);
+      _scheduleDismiss();
+    } else {
+      // Sin apuesta: fade-out inmediato
+      _dismissTimer?.cancel();
+      _bidAnim.reverse();
     }
   }
 
@@ -122,7 +127,7 @@ class _PremiumTableWidgetState extends State<PremiumTableWidget>
   void _scheduleDismiss() {
     _dismissTimer = Timer(const Duration(seconds: 4), () {
       if (mounted) {
-        _bidAnim.animateBack(
+        _bidAnim.animateTo(
           0.0,
           duration: const Duration(milliseconds: 700),
           curve: Curves.easeInCubic,
@@ -213,7 +218,7 @@ class _PremiumTableWidgetState extends State<PremiumTableWidget>
                           // 2. Marca de agua: Logo "DUDO / CACHO" en el centro del paño
                           Center(
                             child: Opacity(
-                              opacity: 0.11,
+                              opacity: 0.22,
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -239,11 +244,11 @@ class _PremiumTableWidgetState extends State<PremiumTableWidget>
                             child: AnimatedBuilder(
                               animation: _bidAnim,
                               builder: (context, _) {
-                                if (_bidAnim.value == 0.0) {
+                                if (_bidAnim.isDismissed) {
                                   return const SizedBox.shrink();
                                 }
                                 return Opacity(
-                                  opacity: _bidOpacity.value,
+                                  opacity: _bidOpacity.value.clamp(0.0, 1.0),
                                   child: Transform.scale(
                                     scale: _bidScale.value.clamp(0.0, 1.05),
                                     child: widget.currentBid != null
