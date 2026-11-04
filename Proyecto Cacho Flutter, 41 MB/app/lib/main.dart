@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
+import 'firebase_options.dart';
 import 'screens/home_screen.dart';
+import 'screens/login_screen.dart';
 import 'services/user_service.dart';
 import 'state/audio.dart';
 import 'state/route_observer.dart';
@@ -10,15 +14,22 @@ import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Inicializar Firebase (debe ir antes de cualquier uso de Auth/Firestore)
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   await Settings.instance.load();
   await Wallet.instance.load();
   await UserService.instance.load();
+
   // Sincronizar saldo de fichas entre Wallet y UserService
-  if (Wallet.instance.balance > 0 && UserService.instance.user.coins != Wallet.instance.balance) {
+  if (Wallet.instance.balance > 0 &&
+      UserService.instance.user.coins != Wallet.instance.balance) {
     UserService.instance.updateProfile(
       UserService.instance.user.copyWith(coins: Wallet.instance.balance),
     );
   }
+
   runApp(const CachoApp());
 }
 
@@ -32,12 +43,6 @@ class CachoApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: buildCachoTheme(),
       navigatorObservers: [appRouteObserver],
-      // Navegación de menú: SIN rutas nombradas ni onGenerateRoute
-      // (las pantallas navegan con rutas directas). La transición
-      // compartida vive en widgets/menu_transitions.dart
-      // (pushMenuPage / MenuPageRoute, fundido + deslizamiento
-      // 150–600 ms, instantánea con animaciones apagadas o
-      // reduce-motion); aquí no hay nada que cablear.
       // iOS bloquea el audio web hasta el primer gesto: el primer
       // toque en cualquier parte desbloquea el contexto de sonido.
       builder: (context, child) => Listener(
@@ -45,7 +50,38 @@ class CachoApp extends StatelessWidget {
         onPointerDown: (_) => AudioService.instance.unlock(),
         child: _PortraitGate(child: child),
       ),
-      home: const HomeScreen(),
+      // AuthGate decide si mostrar Login o Home según la sesión de Firebase
+      home: const _AuthGate(),
+    );
+  }
+}
+
+/// Escucha el stream de Firebase Auth y navega a Login o Home según el estado.
+class _AuthGate extends StatelessWidget {
+  const _AuthGate();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // Mientras Firebase comprueba el estado de sesión
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(color: CachoColors.gold),
+            ),
+          );
+        }
+
+        // Si hay sesión activa (Google o anónimo), ir al Home
+        if (snapshot.hasData && snapshot.data != null) {
+          return const HomeScreen();
+        }
+
+        // Sin sesión: mostrar pantalla de Login
+        return const LoginScreen();
+      },
     );
   }
 }

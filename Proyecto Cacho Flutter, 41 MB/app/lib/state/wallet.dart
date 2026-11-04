@@ -95,6 +95,14 @@ class Wallet extends ChangeNotifier {
     _lastRescueDay = _today();
     credit(rescueCoins);
   }
+
+  /// Establece el saldo directamente (usado al sincronizar desde Firestore).
+  void setBalance(int amount) {
+    if (amount < 0) return;
+    balance = amount;
+    _save();
+    notifyListeners();
+  }
 }
 
 /// 2000 → "2.000" (formato chileno, sin decimales).

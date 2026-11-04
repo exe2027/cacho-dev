@@ -1,11 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 import '../models/cup_skin_model.dart';
 import '../models/avatar_frame_model.dart';
 import '../state/wallet.dart';
 
 /// Servicio central para la gestión del usuario, niveles/XP, estadísticas y skins equipadas.
+/// Persiste localmente con SharedPreferences y en la nube con Firestore cuando el usuario está autenticado.
 class UserService extends ChangeNotifier {
   static final UserService instance = UserService._();
   UserService._();
@@ -19,14 +22,44 @@ class UserService extends ChangeNotifier {
   CupSkinModel get equippedCupSkin => CupSkinModel.getById(_user.equippedCupSkinId);
   AvatarFrameModel get equippedFrame => AvatarFrameModel.getById(_user.equippedFrameId);
 
+  /// Referencia de Firestore para el usuario actual
+  DocumentReference<Map<String, dynamic>>? get _firestoreRef {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return null;
+    return FirebaseFirestore.instance.collection('users').doc(uid);
+  }
+
   Future<void> load() async {
+    try {
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser != null) {
+        // Cargar desde Firestore si hay sesión activa
+        await syncFromFirestore(firebaseUser);
+      } else {
+        // Sin sesión: cargar desde SharedPreferences (invitado local)
+        await _loadFromLocal();
+      }
+    } catch (_) {
+      // Fallback para entornos de test o sin red
+      await _loadFromLocal();
+    }
+
+    // Escuchar Wallet.instance para que las monedas de las salas y perfil sean idénticas
+    Wallet.instance.removeListener(_onWalletChanged);
+    Wallet.instance.addListener(_onWalletChanged);
+
+    _loaded = true;
+    notifyListeners();
+  }
+
+  Future<void> _loadFromLocal() async {
     try {
       final p = await SharedPreferences.getInstance();
       final jsonStr = p.getString('cacho_user_profile');
       if (jsonStr != null && jsonStr.isNotEmpty) {
         _user = UserModel.fromJson(jsonStr);
       } else {
-        // Inicializar perfil predeterminado
+        // Perfil predeterminado de invitado
         _user = UserModel(
           id: 'guest_local',
           name: 'Jugador',
@@ -35,19 +68,156 @@ class UserService extends ChangeNotifier {
           level: 1,
           xp: 0,
         );
-        await save();
+        await _saveToLocal();
       }
-      // Asegurar sincronización inmediata con la billetera de las salas
+      // Sincronizar monedas con Wallet
       _user = _user.copyWith(coins: Wallet.instance.balance);
-    } catch (_) {
-      // Fallback para entornos de test
-    }
-    
-    // Escuchar Wallet.instance para que las monedas de las salas y perfil sean idénticas
-    Wallet.instance.removeListener(_onWalletChanged);
-    Wallet.instance.addListener(_onWalletChanged);
+    } catch (_) {}
+  }
 
-    _loaded = true;
+  /// Sincroniza el perfil desde Firestore. Si no existe el documento, lo crea.
+  Future<void> syncFromFirestore(User firebaseUser) async {
+    try {
+      final ref = FirebaseFirestore.instance.collection('users').doc(firebaseUser.uid);
+      final doc = await ref.get();
+
+      if (doc.exists && doc.data() != null) {
+        // Cargar datos existentes de Firestore
+        final data = doc.data()!;
+        _user = UserModel.fromMap({
+          ...data,
+          'id': firebaseUser.uid,
+          'isGuest': firebaseUser.isAnonymous,
+          'email': firebaseUser.email ?? data['email'] ?? '',
+          'avatarUrl': firebaseUser.photoURL ?? data['avatarUrl'] ?? '',
+        });
+      } else {
+        // Primer login: combinar datos locales con datos de Firebase
+        final localData = _user.toMap();
+        _user = _user.copyWith(
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName ?? _user.name,
+          email: firebaseUser.email ?? '',
+          avatarUrl: firebaseUser.photoURL ?? '',
+          isGuest: firebaseUser.isAnonymous,
+        );
+        // Guardar en Firestore (primer registro)
+        await ref.set({
+          ...localData,
+          'id': firebaseUser.uid,
+          'name': _user.name,
+          'email': _user.email,
+          'avatarUrl': _user.avatarUrl,
+          'isGuest': _user.isGuest,
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastLogin': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // Sincronizar monedas con Wallet
+      Wallet.instance.setBalance(_user.coins);
+      _user = _user.copyWith(coins: Wallet.instance.balance);
+
+      // Actualizar timestamp de último login
+      await ref.update({'lastLogin': FieldValue.serverTimestamp()});
+    } catch (e) {
+      // Si falla Firestore, usar datos locales como fallback
+      await _loadFromLocal();
+    }
+    notifyListeners();
+  }
+
+  /// Crea un perfil de invitado con el UID de Firebase (anónimo)
+  Future<void> createGuestProfile({required String uid, String? nickname}) async {
+    final r = uid.substring(0, 6);
+    final name = nickname ?? 'Jugador $r';
+    _user = _user.copyWith(
+      id: uid,
+      name: name,
+      email: '',
+      avatarUrl: '',
+      isGuest: true,
+    );
+    // Los invitados también tienen documento en Firestore para poder migrar sus datos
+    try {
+      final ref = FirebaseFirestore.instance.collection('users').doc(uid);
+      final doc = await ref.get();
+      if (!doc.exists) {
+        await ref.set({
+          ..._user.toMap(),
+          'isGuest': true,
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastLogin': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (_) {}
+    await _saveToLocal();
+    notifyListeners();
+  }
+
+  /// Migra los datos del invitado local a la cuenta de Google en Firestore.
+  /// Toma el máximo de monedas/cash y une los items comprados.
+  Future<void> migrateGuestToGoogle(User firebaseUser) async {
+    final localUser = _user;
+
+    try {
+      final ref = FirebaseFirestore.instance.collection('users').doc(firebaseUser.uid);
+      final doc = await ref.get();
+      final Map<String, dynamic> cloudData = doc.exists ? doc.data()! : {};
+
+      // Merge: tomar el máximo de economía y unir inventarios
+      final mergedCoins = [localUser.coins, (cloudData['coins'] as num?)?.toInt() ?? 0].reduce((a, b) => a > b ? a : b);
+      final mergedCash = [localUser.cash, (cloudData['cash'] as num?)?.toInt() ?? 0].reduce((a, b) => a > b ? a : b);
+      final mergedLevel = [localUser.level, (cloudData['level'] as num?)?.toInt() ?? 1].reduce((a, b) => a > b ? a : b);
+      final mergedXp = [localUser.xp, (cloudData['xp'] as num?)?.toInt() ?? 0].reduce((a, b) => a > b ? a : b);
+
+      final cloudCupSkins = (cloudData['ownedCupSkinIds'] as List<dynamic>?)?.map((e) => e.toString()).toSet() ?? {};
+      final cloudFrames = (cloudData['ownedFrameIds'] as List<dynamic>?)?.map((e) => e.toString()).toSet() ?? {};
+      final mergedCupSkins = {...localUser.ownedCupSkinIds, ...cloudCupSkins}.toList();
+      final mergedFrames = {...localUser.ownedFrameIds, ...cloudFrames}.toList();
+
+      _user = localUser.copyWith(
+        id: firebaseUser.uid,
+        name: firebaseUser.displayName ?? localUser.name,
+        email: firebaseUser.email ?? '',
+        avatarUrl: firebaseUser.photoURL ?? '',
+        isGuest: false,
+        coins: mergedCoins,
+        cash: mergedCash,
+        level: mergedLevel,
+        xp: mergedXp,
+        ownedCupSkinIds: mergedCupSkins,
+        ownedFrameIds: mergedFrames,
+      );
+
+      Wallet.instance.setBalance(mergedCoins);
+
+      await ref.set({
+        ..._user.toMap(),
+        'isGuest': false,
+        'lastLogin': FieldValue.serverTimestamp(),
+        if (!doc.exists) 'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (_) {
+      // Si falla, igual actualizamos localmente
+      _user = localUser.copyWith(
+        id: firebaseUser.uid,
+        name: firebaseUser.displayName ?? localUser.name,
+        email: firebaseUser.email ?? '',
+        avatarUrl: firebaseUser.photoURL ?? '',
+        isGuest: false,
+      );
+    }
+
+    await _saveToLocal();
+    notifyListeners();
+  }
+
+  /// Limpia el perfil local al cerrar sesión
+  Future<void> clearLocalProfile() async {
+    _user = const UserModel(id: 'guest_default', name: 'Jugador');
+    Wallet.instance.setBalance(_user.coins);
+    await _saveToLocal();
     notifyListeners();
   }
 
@@ -59,11 +229,27 @@ class UserService extends ChangeNotifier {
   }
 
   Future<void> save() async {
+    await _saveToLocal();
+    await _saveToFirestore();
+    notifyListeners();
+  }
+
+  Future<void> _saveToLocal() async {
     try {
       final p = await SharedPreferences.getInstance();
       await p.setString('cacho_user_profile', _user.toJson());
     } catch (_) {}
-    notifyListeners();
+  }
+
+  Future<void> _saveToFirestore() async {
+    try {
+      final ref = _firestoreRef;
+      if (ref == null) return;
+      await ref.set({
+        ..._user.toMap(),
+        'lastUpdated': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (_) {}
   }
 
   void updateProfile(UserModel newUser) {
@@ -208,4 +394,3 @@ class UserService extends ChangeNotifier {
     }
   }
 }
-

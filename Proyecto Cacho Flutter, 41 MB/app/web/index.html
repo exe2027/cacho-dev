@@ -44,6 +44,14 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <!-- Firebase SDK para web — reemplaza los valores con los de tu proyecto -->
+  <!-- Estos scripts son necesarios para Firebase Auth y Firestore en el navegador -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+    // La inicialización real la hace Flutter a través de firebase_options.dart
+    // Estos imports hacen que el SDK esté disponible globalmente
+  </script>
+
   <script src="yt_bridge.js"></script>
   <!-- Síncrono (sin defer): window.CachoViewport debe existir antes de
        flutter_bootstrap.js (async), que puede ejecutarse antes que un

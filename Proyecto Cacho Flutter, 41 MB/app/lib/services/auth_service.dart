@@ -1,11 +1,15 @@
-import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'user_service.dart';
 
-/// Servicio de Autenticación con soporte para Google Sign-In simulado/nativo y Modo Invitado (Guest).
+/// Servicio de Autenticación real con Firebase Auth: Google Sign-In y modo Invitado (anónimo).
 class AuthService extends ChangeNotifier {
   static final AuthService instance = AuthService._();
-  AuthService._();
+  AuthService._() {
+    // Escuchar cambios de estado de autenticación de Firebase
+    FirebaseAuth.instance.authStateChanges().listen(_onAuthStateChanged);
+  }
 
   bool _isLoading = false;
   String? _authError;
@@ -14,32 +18,60 @@ class AuthService extends ChangeNotifier {
   String? get authError => _authError;
   bool get isAuthenticated => !UserService.instance.user.isGuest;
 
-  /// Iniciar sesión con Google (simulación instantánea y extensible con credenciales de OAuth)
-  Future<bool> signInWithGoogle({String? customName, String? customEmail}) async {
+  /// Escucha cambios en el estado de Firebase Auth y sincroniza UserService
+  Future<void> _onAuthStateChanged(User? firebaseUser) async {
+    if (firebaseUser == null) return;
+    // Sincronizar perfil con Firestore cuando el usuario ya está autenticado
+    await UserService.instance.syncFromFirestore(firebaseUser);
+    notifyListeners();
+  }
+
+  /// Iniciar sesión con Google (OAuth real vía Firebase)
+  Future<bool> signInWithGoogle() async {
     _isLoading = true;
     _authError = null;
     notifyListeners();
 
     try {
-      // Simulación de respuesta de Google OAuth sin dependencias externas pesadas
-      await Future<void>.delayed(const Duration(milliseconds: 600));
+      UserCredential credential;
 
-      final currentUser = UserService.instance.user;
-      final email = customEmail ?? 'jugador_${currentUser.id.substring(0, min(6, currentUser.id.length))}@gmail.com';
-      final name = customName ?? (currentUser.name.startsWith('Jugador') ? 'Google Player' : currentUser.name);
+      if (kIsWeb) {
+        // En web se usa popup (no redirect para simplificar)
+        final provider = GoogleAuthProvider();
+        credential = await FirebaseAuth.instance.signInWithPopup(provider);
+      } else {
+        // En móvil se usa el flujo nativo de Google Sign-In
+        final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+        if (googleUser == null) {
+          // El usuario canceló el flujo
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+        final GoogleSignInAuthentication googleAuth =
+            await googleUser.authentication;
+        credential = await FirebaseAuth.instance.signInWithCredential(
+          GoogleAuthProvider.credential(
+            accessToken: googleAuth.accessToken,
+            idToken: googleAuth.idToken,
+          ),
+        );
+      }
 
-      final loggedInUser = currentUser.copyWith(
-        id: 'google_${DateTime.now().millisecondsSinceEpoch}',
-        name: name,
-        email: email,
-        avatarUrl: 'https://lh3.googleusercontent.com/a/default-user',
-        isGuest: false,
-      );
+      final firebaseUser = credential.user;
+      if (firebaseUser == null) throw Exception('Usuario nulo tras Google Auth');
 
-      UserService.instance.updateProfile(loggedInUser);
+      // Migrar datos locales (invitado) a la cuenta de Google en Firestore
+      await UserService.instance.migrateGuestToGoogle(firebaseUser);
+
       _isLoading = false;
       notifyListeners();
       return true;
+    } on FirebaseAuthException catch (e) {
+      _isLoading = false;
+      _authError = _translateFirebaseError(e.code);
+      notifyListeners();
+      return false;
     } catch (e) {
       _isLoading = false;
       _authError = 'No se pudo iniciar sesión con Google: $e';
@@ -48,46 +80,59 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// Iniciar sesión como Invitado (Guest anónimo)
+  /// Iniciar sesión como Invitado (anónimo en Firebase)
   Future<void> signInAsGuest({String? nickname}) async {
     _isLoading = true;
+    _authError = null;
     notifyListeners();
 
-    await Future<void>.delayed(const Duration(milliseconds: 200));
+    try {
+      final credential = await FirebaseAuth.instance.signInAnonymously();
+      final firebaseUser = credential.user;
+      if (firebaseUser == null) throw Exception('Usuario anónimo nulo');
 
-    final r = Random().nextInt(9999).toString().padLeft(4, '0');
-    final guestId = 'guest_$r';
-    final name = nickname ?? 'Jugador $r';
+      // Crear perfil de invitado con el UID de Firebase
+      await UserService.instance.createGuestProfile(
+        uid: firebaseUser.uid,
+        nickname: nickname,
+      );
+    } on FirebaseAuthException catch (e) {
+      _authError = _translateFirebaseError(e.code);
+    } catch (e) {
+      _authError = 'No se pudo iniciar como invitado: $e';
+    }
 
-    final guestUser = UserService.instance.user.copyWith(
-      id: guestId,
-      name: name,
-      email: '',
-      avatarUrl: '',
-      isGuest: true,
-    );
-
-    UserService.instance.updateProfile(guestUser);
     _isLoading = false;
     notifyListeners();
   }
 
-  /// Cerrar sesión y volver al perfil de Invitado
+  /// Cerrar sesión de Firebase y volver a perfil de invitado
   Future<void> signOut() async {
     _isLoading = true;
     notifyListeners();
 
-    await Future<void>.delayed(const Duration(milliseconds: 200));
+    try {
+      await GoogleSignIn().signOut();
+      await FirebaseAuth.instance.signOut();
+      await UserService.instance.clearLocalProfile();
+    } catch (_) {}
 
-    final resetGuest = UserService.instance.user.copyWith(
-      isGuest: true,
-      email: '',
-      avatarUrl: '',
-    );
-
-    UserService.instance.updateProfile(resetGuest);
     _isLoading = false;
     notifyListeners();
   }
-}
 
+  /// Convierte códigos de error de Firebase a mensajes en español
+  String _translateFirebaseError(String code) {
+    switch (code) {
+      case 'network-request-failed':
+        return 'Sin conexión. Revisa tu internet.';
+      case 'popup-closed-by-user':
+      case 'cancelled-popup-request':
+        return 'Inicio de sesión cancelado.';
+      case 'account-exists-with-different-credential':
+        return 'Ya existe una cuenta con ese email.';
+      default:
+        return 'Error al iniciar sesión ($code).';
+    }
+  }
+}

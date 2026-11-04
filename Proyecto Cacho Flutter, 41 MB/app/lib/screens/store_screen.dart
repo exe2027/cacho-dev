@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../models/avatar_frame_model.dart';
 import '../models/cup_skin_model.dart';
 import '../models/shop_item_model.dart';
@@ -1007,9 +1007,7 @@ class _StoreScreenState extends State<StoreScreen>
                         ),
                         onPressed: () async {
                           Navigator.of(dialogCtx).pop();
-                          await AuthService.instance.signInWithGoogle(
-                            customName: nameCtrl.text.trim().isNotEmpty ? nameCtrl.text.trim() : null,
-                          );
+                          await AuthService.instance.signInWithGoogle();
                         },
                       ),
                     ] else ...[
