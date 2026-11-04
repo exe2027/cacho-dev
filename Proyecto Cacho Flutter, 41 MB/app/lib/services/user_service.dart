@@ -3,8 +3,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import '../models/cup_skin_model.dart';
 import '../models/avatar_frame_model.dart';
+import '../state/wallet.dart';
 
-/// Servicio central para la gestión del usuario, niveles/XP, estadísticas y cosméticos equipados.
+/// Servicio central para la gestión del usuario, niveles/XP, estadísticas y skins equipadas.
 class UserService extends ChangeNotifier {
   static final UserService instance = UserService._();
   UserService._();
@@ -12,7 +13,7 @@ class UserService extends ChangeNotifier {
   UserModel _user = const UserModel(id: 'guest_default', name: 'Jugador');
   bool _loaded = false;
 
-  UserModel get user => _user;
+  UserModel get user => _user.copyWith(coins: Wallet.instance.balance);
   bool get loaded => _loaded;
 
   CupSkinModel get equippedCupSkin => CupSkinModel.getById(_user.equippedCupSkinId);
@@ -26,21 +27,35 @@ class UserService extends ChangeNotifier {
         _user = UserModel.fromJson(jsonStr);
       } else {
         // Inicializar perfil predeterminado
-        _user = const UserModel(
+        _user = UserModel(
           id: 'guest_local',
           name: 'Jugador',
-          coins: 5000,
+          coins: Wallet.instance.balance,
           cash: 100,
           level: 1,
           xp: 0,
         );
         await save();
       }
+      // Asegurar sincronización inmediata con la billetera de las salas
+      _user = _user.copyWith(coins: Wallet.instance.balance);
     } catch (_) {
       // Fallback para entornos de test
     }
+    
+    // Escuchar Wallet.instance para que las monedas de las salas y perfil sean idénticas
+    Wallet.instance.removeListener(_onWalletChanged);
+    Wallet.instance.addListener(_onWalletChanged);
+
     _loaded = true;
     notifyListeners();
+  }
+
+  void _onWalletChanged() {
+    if (_user.coins != Wallet.instance.balance) {
+      _user = _user.copyWith(coins: Wallet.instance.balance);
+      save();
+    }
   }
 
   Future<void> save() async {
@@ -79,11 +94,15 @@ class UserService extends ChangeNotifier {
       neededXp = currentLevel * 500;
     }
 
+    if (rewardCoins > 0) {
+      Wallet.instance.credit(rewardCoins);
+    }
+
     _user = _user.copyWith(
       xp: newXp,
       level: currentLevel,
       cash: _user.cash + rewardCash,
-      coins: _user.coins + rewardCoins,
+      coins: Wallet.instance.balance,
       gamesPlayed: _user.gamesPlayed + 1,
       gamesWon: won ? (_user.gamesWon + 1) : _user.gamesWon,
     );
@@ -100,20 +119,23 @@ class UserService extends ChangeNotifier {
     };
   }
 
-  /// Añade monedas (Coins)
+  /// Añade monedas (Coins) directamente a la billetera compartida de salas
   void addCoins(int amount) {
     if (amount <= 0) return;
-    _user = _user.copyWith(coins: _user.coins + amount);
+    Wallet.instance.credit(amount);
+    _user = _user.copyWith(coins: Wallet.instance.balance);
     save();
   }
 
-  /// Consume monedas para apuestas (Coins)
+  /// Consume monedas para apuestas (Coins) desde la billetera compartida
   bool deductCoins(int amount) {
     if (amount <= 0) return true;
-    if (_user.coins < amount) return false;
-    _user = _user.copyWith(coins: _user.coins - amount);
-    save();
-    return true;
+    final ok = Wallet.instance.charge(amount);
+    if (ok) {
+      _user = _user.copyWith(coins: Wallet.instance.balance);
+      save();
+    }
+    return ok;
   }
 
   /// Añade billetes (Cash)

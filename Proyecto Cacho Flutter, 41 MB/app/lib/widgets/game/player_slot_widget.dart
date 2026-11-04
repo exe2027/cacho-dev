@@ -8,6 +8,7 @@ import '../../models/cup_skin_model.dart';
 import '../../services/user_service.dart';
 import '../../theme.dart';
 import '../dice_and_cup.dart';
+import 'animated_skin_effects.dart';
 import 'star_level_badge.dart';
 
 /// Coordenadas porcentuales relativas para los 6 asientos montados en el carril de la mesa:
@@ -427,6 +428,21 @@ class _PlayerSlotWidgetState extends State<PlayerSlotWidget>
           alignment: Alignment.center,
           clipBehavior: Clip.none,
           children: [
+            // Efecto animado del marco de avatar (Aura de fuego, neón láser, oro)
+            if (frame.effectType != 'none')
+              Positioned(
+                left: -7,
+                top: -7,
+                right: -7,
+                bottom: -7,
+                child: CustomPaint(
+                  painter: AnimatedFramePainter(
+                    frame: frame,
+                    animationValue: pulse,
+                  ),
+                ),
+              ),
+
             // Indicador de turno: Anillo temporizador con resplandor dorado
             if (widget.isTurn && widget.turnProgress != null)
               SizedBox(
@@ -556,9 +572,6 @@ class _PlayerSlotWidgetState extends State<PlayerSlotWidget>
     final cupSkin = widget.isLocalUser
         ? UserService.instance.equippedCupSkin
         : CupSkinModel.standard;
-    final cupAsset = widget.isLocalUser
-        ? cupSkin.assetPath
-        : widget.roomConfig.cupAssetPath;
 
     // Vaso con elevación e inclinación física interactiva
     Widget cupVisual = AnimatedBuilder(
@@ -582,32 +595,11 @@ class _PlayerSlotWidgetState extends State<PlayerSlotWidget>
             alignment: Alignment.center,
             clipBehavior: Clip.none,
             children: [
-              // Imagen del vaso de cuero con skin equipada y brillo
-              Container(
-                decoration: cupSkin.isAnimated
-                    ? BoxDecoration(
-                        boxShadow: [
-                          BoxShadow(
-                            color: cupSkin.glowColor.withValues(alpha: 0.45),
-                            blurRadius: 8,
-                            spreadRadius: 1,
-                          ),
-                        ],
-                      )
-                    : null,
-                child: Image.asset(
-                  cupAsset,
-                  width: 30,
-                  height: 32,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) {
-                    return Icon(
-                      Icons.sports_bar,
-                      size: 26,
-                      color: widget.roomConfig.accentColor,
-                    );
-                  },
-                ),
+              // Imagen y efectos visuales animados de la skin del vaso
+              AnimatedCupVisual(
+                skin: cupSkin,
+                width: 30,
+                height: 32,
               ),
 
               // Puntos indicadores de dados restantes cuando está cerrado

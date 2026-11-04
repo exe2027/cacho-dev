@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:blobatar/flutter.dart' as blobatar;
 import '../../models/avatar_frame_model.dart';
+import 'animated_skin_effects.dart';
 import 'star_level_badge.dart';
 
 /// Widget reutilizable para mostrar el avatar de un jugador con su marco cosmético (AvatarFrame)
@@ -65,102 +66,68 @@ class _PlayerAvatarWidgetState extends State<PlayerAvatarWidget>
           alignment: Alignment.center,
           clipBehavior: Clip.none,
           children: [
-            // Marco cosmético animado o estático
+            // Marco animado con efecto de alto impacto
             AnimatedBuilder(
               animation: _animCtrl,
               builder: (context, child) {
-                final pulse = _animCtrl.value;
-                BoxDecoration decoration;
-
-                switch (frame.effectType) {
-                  case 'fire':
-                    decoration = BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Color.lerp(const Color(0xFFFF3300), const Color(0xFFFF9900), pulse)!,
-                        width: frame.borderWidth,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFFF4500).withValues(alpha: 0.6 + pulse * 0.35),
-                          blurRadius: 10 + pulse * 8,
-                          spreadRadius: 1.5 + pulse * 2,
+                return SizedBox(
+                  width: size + 14,
+                  height: size + 14,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Renderizado de aura/fuego/neón/oro con partículas vivas
+                      if (frame.effectType != 'none')
+                        Positioned.fill(
+                          child: CustomPaint(
+                            painter: AnimatedFramePainter(
+                              frame: frame,
+                              animationValue: _animCtrl.value,
+                            ),
+                          ),
                         ),
-                      ],
-                    );
-                    break;
-                  case 'neon':
-                    decoration = BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Color.lerp(const Color(0xFF00F0FF), const Color(0xFF7000FF), pulse)!,
-                        width: frame.borderWidth,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF00F0FF).withValues(alpha: 0.5 + pulse * 0.4),
-                          blurRadius: 8 + pulse * 6,
-                          spreadRadius: 1.0 + pulse * 1.5,
+                      // Contenedor principal del avatar
+                      Container(
+                        width: size,
+                        height: size,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: frame.effectType == 'none'
+                                ? (widget.isTurn ? accent : Colors.white30)
+                                : Colors.transparent,
+                            width: widget.isTurn ? 2.5 : 1.5,
+                          ),
+                          boxShadow: widget.isTurn
+                              ? [
+                                  BoxShadow(
+                                    color: accent.withValues(alpha: 0.6),
+                                    blurRadius: 10,
+                                    spreadRadius: 2,
+                                  ),
+                                ]
+                              : const [
+                                  BoxShadow(
+                                    color: Colors.black45,
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
                         ),
-                      ],
-                    );
-                    break;
-                  case 'gold':
-                    decoration = BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFFFFD700),
-                        width: frame.borderWidth,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFD4AF37).withValues(alpha: 0.5 + pulse * 0.3),
-                          blurRadius: 7 + pulse * 5,
-                          spreadRadius: 1.0,
+                        child: ClipOval(
+                          child: blobatar.Blobatar(
+                            name: widget.name,
+                            size: size,
+                            options: blobatar.BlobatarOptions(
+                              background: blobatar.Backdrop.circle,
+                              expression: widget.isEliminated
+                                  ? blobatar.sad
+                                  : (widget.isTurn ? blobatar.thinking : blobatar.happy),
+                            ),
+                          ),
                         ),
-                      ],
-                    );
-                    break;
-                  default:
-                    decoration = BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: widget.isTurn ? accent : Colors.white30,
-                        width: widget.isTurn ? 2.5 : 1.5,
                       ),
-                      boxShadow: widget.isTurn
-                          ? [
-                              BoxShadow(
-                                color: accent.withValues(alpha: 0.6),
-                                blurRadius: 10,
-                                spreadRadius: 2,
-                              ),
-                            ]
-                          : const [
-                              BoxShadow(
-                                color: Colors.black45,
-                                blurRadius: 4,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                    );
-                }
-
-                return Container(
-                  width: size,
-                  height: size,
-                  decoration: decoration,
-                  child: ClipOval(
-                    child: blobatar.Blobatar(
-                      name: widget.name,
-                      size: size,
-                      options: blobatar.BlobatarOptions(
-                        background: blobatar.Backdrop.circle,
-                        expression: widget.isEliminated
-                            ? blobatar.sad
-                            : (widget.isTurn ? blobatar.thinking : blobatar.happy),
-                      ),
-                    ),
+                    ],
                   ),
                 );
               },

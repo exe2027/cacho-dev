@@ -6,6 +6,7 @@ import 'package:cacho_app/models/shop_item_model.dart';
 import 'package:cacho_app/services/user_service.dart';
 import 'package:cacho_app/services/auth_service.dart';
 import 'package:cacho_app/services/shop_controller.dart';
+import 'package:cacho_app/state/wallet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -97,6 +98,22 @@ void main() {
       expect(res2['rewardCoins'], 1000);
       expect(s.user.level, 2);
       expect(s.user.xp, 100); // 300 + 300 = 600 - 500 = 100
+    });
+
+    test('Coins are 100% unified with Wallet.instance across rooms', () async {
+      await Wallet.instance.load();
+      final s = UserService.instance;
+      await s.load();
+
+      expect(s.user.coins, Wallet.instance.balance);
+
+      // Si gana en una sala o Wallet acredita saldo:
+      Wallet.instance.credit(500);
+      expect(s.user.coins, Wallet.instance.balance);
+
+      // Si gasta en buy-in de sala:
+      Wallet.instance.charge(250);
+      expect(s.user.coins, Wallet.instance.balance);
     });
   });
 

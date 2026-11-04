@@ -6,9 +6,10 @@ import '../services/auth_service.dart';
 import '../services/shop_controller.dart';
 import '../services/user_service.dart';
 import '../theme.dart';
+import '../widgets/game/animated_skin_effects.dart';
 import '../widgets/game/player_avatar_widget.dart';
 
-/// Pantalla completa de Tienda y Cosméticos del juego Cacho / Dudo
+/// Pantalla completa de Tienda y Skins del juego Cacho / Dudo
 class StoreScreen extends StatefulWidget {
   final int initialTabIndex;
 
@@ -109,7 +110,7 @@ class _StoreScreenState extends State<StoreScreen>
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
-          'TIENDA & COSMÉTICOS',
+          'TIENDA & SKINS',
           style: TextStyle(
             fontFamily: 'Montserrat',
             fontWeight: FontWeight.w800,
@@ -124,14 +125,14 @@ class _StoreScreenState extends State<StoreScreen>
             icon: Icons.monetization_on,
             iconColor: const Color(0xFFFFD700),
             value: _formatNumber(user.coins),
-            tooltip: 'Fichas (Entrada a mesas)',
+            tooltip: 'Fichas de las salas (Entrada y apuestas)',
           ),
           const SizedBox(width: 8),
           _buildCurrencyPill(
             icon: Icons.payments,
             iconColor: const Color(0xFF34C759),
             value: '\$${user.cash}',
-            tooltip: 'Billetes (Para comprar cosméticos)',
+            tooltip: 'Billetes (Para comprar skins)',
           ),
           const SizedBox(width: 14),
         ],
@@ -154,7 +155,7 @@ class _StoreScreenState extends State<StoreScreen>
             ),
             Tab(
               icon: Icon(Icons.palette, size: 18),
-              text: 'COSMÉTICOS',
+              text: 'SKINS',
             ),
           ],
         ),
@@ -167,7 +168,7 @@ class _StoreScreenState extends State<StoreScreen>
               controller: _tabController,
               children: [
                 _buildCurrencyTab(),
-                _buildCosmeticsTab(),
+                _buildSkinsTab(),
               ],
             ),
           ),
@@ -338,8 +339,8 @@ class _StoreScreenState extends State<StoreScreen>
       children: [
         // SECCIÓN 1: FICHAS PARA ENTRADA A MESAS
         _buildSectionHeader(
-          title: 'FICHAS (COINS)',
-          subtitle: 'Utilizadas exclusivamente para el pago de la tarifa de entrada (Buy-in) en las mesas.',
+          title: 'FICHAS DE SALA (COINS)',
+          subtitle: 'Las mismas fichas de las salas (Taberna, Casino, Mansión) para pagar entradas y apuestas.',
           icon: Icons.monetization_on,
           color: const Color(0xFFFFD700),
         ),
@@ -347,10 +348,10 @@ class _StoreScreenState extends State<StoreScreen>
         ...ShopItemModel.coinPackages.map((pack) => _buildCoinPackCard(pack)),
         const SizedBox(height: 22),
 
-        // SECCIÓN 2: BILLETES PARA COSMÉTICOS
+        // SECCIÓN 2: BILLETES PARA SKINS
         _buildSectionHeader(
           title: 'BILLETES (CASH PREMIUM)',
-          subtitle: 'Moneda para adquirir cosméticos, skins exclusivas y marcos de avatar en la tienda.',
+          subtitle: 'Moneda para adquirir skins exclusivas de vasos y marcos animados en la tienda.',
           icon: Icons.payments,
           color: const Color(0xFF34C759),
         ),
@@ -596,7 +597,7 @@ class _StoreScreenState extends State<StoreScreen>
     );
   }
 
-  Widget _buildCosmeticsTab() {
+  Widget _buildSkinsTab() {
     final user = UserService.instance.user;
 
     return ListView(
@@ -605,7 +606,7 @@ class _StoreScreenState extends State<StoreScreen>
         // SECCIÓN 1: SKINS DE VASOS
         _buildSectionHeader(
           title: 'SKINS DE VASOS (CACHOS)',
-          subtitle: 'Personaliza tu vaso de cuero en la mesa. Visible para todos los jugadores.',
+          subtitle: 'Personaliza tu vaso de cuero en la mesa con animaciones exclusivas (fuego, destellos dorados y runas).',
           icon: Icons.wine_bar,
           color: CachoColors.gold,
         ),
@@ -617,10 +618,10 @@ class _StoreScreenState extends State<StoreScreen>
         }),
         const SizedBox(height: 24),
 
-        // SECCIÓN 2: MARCOS DE AVATAR
+        // SECCIÓN 2: SKINS DE AVATAR (MARCOS)
         _buildSectionHeader(
-          title: 'MARCOS DE AVATAR',
-          subtitle: 'Efectos visuales animados y auras relucientes alrededor de tu foto de perfil.',
+          title: 'SKINS DE AVATAR (MARCOS)',
+          subtitle: 'Efectos visuales animados (Aura de fuego viva, neón cyberpunk y oro reluciente) alrededor de tu perfil.',
           icon: Icons.camera_front,
           color: const Color(0xFF00F0FF),
         ),
@@ -660,34 +661,30 @@ class _StoreScreenState extends State<StoreScreen>
       ),
       child: Row(
         children: [
-          // Vista previa del vaso
+          // Vista previa del vaso con animación viva de la skin
           Container(
-            width: 58,
-            height: 58,
-            padding: const EdgeInsets.all(6),
+            width: 62,
+            height: 62,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: skin.gradientColors,
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: skin.glowColor, width: 1.2),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: skin.glowColor, width: 1.4),
               boxShadow: [
                 BoxShadow(
                   color: skin.glowColor.withValues(alpha: 0.35),
-                  blurRadius: 6,
+                  blurRadius: 8,
                 ),
               ],
             ),
-            child: Image.asset(
-              skin.assetPath,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const Icon(
-                Icons.wine_bar,
-                color: CachoColors.gold,
-                size: 30,
-              ),
+            child: AnimatedCupVisual(
+              skin: skin,
+              width: 36,
+              height: 38,
             ),
           ),
           const SizedBox(width: 14),

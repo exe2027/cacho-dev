@@ -874,10 +874,10 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
           ),
-          // Botón Tienda & Cosméticos
+          // Botón Tienda & Skins
           IconButton(
             icon: const Icon(Icons.storefront, color: CachoColors.gold, size: 23),
-            tooltip: 'TIENDA & COSMÉTICOS',
+            tooltip: 'TIENDA & SKINS',
             onPressed: () => pushMenuPage(context,
                 builder: (_) => const StoreScreen()),
           ),
