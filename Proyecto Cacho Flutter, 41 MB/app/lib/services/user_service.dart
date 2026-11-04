@@ -221,6 +221,51 @@ class UserService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Actualiza el apodo del usuario.
+  /// 1er cambio: GRATIS (nicknameChanges == 0).
+  /// 2do cambio en adelante: cuesta 500 Cash.
+  /// Retorna un mapa {'success': bool, 'message': String}.
+  Future<Map<String, dynamic>> updateNickname(String newName) async {
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty) {
+      return {'success': false, 'message': 'El apodo no puede estar vacío'};
+    }
+    if (trimmed.length > 12) {
+      return {'success': false, 'message': 'El apodo no puede superar 12 caracteres'};
+    }
+    if (trimmed == _user.name) {
+      return {'success': false, 'message': 'El apodo es idéntico al actual'};
+    }
+
+    final isFree = _user.nicknameChanges == 0;
+    const cost = 500;
+
+    if (!isFree && _user.cash < cost) {
+      return {
+        'success': false,
+        'message': 'Necesitas \$500 Cash para cambiar de apodo (tienes \$${_user.cash})',
+      };
+    }
+
+    final newCash = isFree ? _user.cash : _user.cash - cost;
+    final newChanges = _user.nicknameChanges + 1;
+
+    _user = _user.copyWith(
+      name: trimmed,
+      cash: newCash,
+      nicknameChanges: newChanges,
+    );
+
+    await save();
+
+    return {
+      'success': true,
+      'message': isFree
+          ? '¡Apodo cambiado gratis a "$trimmed"!'
+          : '¡Apodo cambiado a "$trimmed" por \$500 Cash!',
+    };
+  }
+
   void _onWalletChanged() {
     if (_user.coins != Wallet.instance.balance) {
       _user = _user.copyWith(coins: Wallet.instance.balance);

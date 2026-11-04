@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cacho_engine/cacho_engine.dart';
 import '../../models/room_config.dart';
@@ -225,7 +225,7 @@ class _PremiumTableWidgetState extends State<PremiumTableWidget>
                                   const DudoLogo(fontSize: 34),
                                   const SizedBox(height: 2),
                                   const Text(
-                                    'CACHO · EL DUDO CHILENO',
+                                    'CACHO · EL DUDO',
                                     style: TextStyle(
                                       fontFamily: CachoFonts.display,
                                       fontSize: 9,

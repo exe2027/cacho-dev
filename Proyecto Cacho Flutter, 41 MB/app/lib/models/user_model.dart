@@ -28,6 +28,9 @@ class UserModel {
   final List<String> ownedCupSkinIds;
   final List<String> ownedFrameIds;
 
+  // Cambios de apodo (0 = 1er cambio gratis, 1+ = cuesta 500 Cash)
+  final int nicknameChanges;
+
   const UserModel({
     required this.id,
     required this.name,
@@ -44,6 +47,7 @@ class UserModel {
     this.equippedFrameId = 'frame_none',
     this.ownedCupSkinIds = const ['cup_standard'],
     this.ownedFrameIds = const ['frame_none'],
+    this.nicknameChanges = 0,
   });
 
   /// XP requerida para alcanzar el siguiente nivel: nivel * 500 XP
@@ -75,6 +79,7 @@ class UserModel {
     String? equippedFrameId,
     List<String>? ownedCupSkinIds,
     List<String>? ownedFrameIds,
+    int? nicknameChanges,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -92,6 +97,7 @@ class UserModel {
       equippedFrameId: equippedFrameId ?? this.equippedFrameId,
       ownedCupSkinIds: ownedCupSkinIds ?? this.ownedCupSkinIds,
       ownedFrameIds: ownedFrameIds ?? this.ownedFrameIds,
+      nicknameChanges: nicknameChanges ?? this.nicknameChanges,
     );
   }
 
@@ -112,6 +118,7 @@ class UserModel {
       'equippedFrameId': equippedFrameId,
       'ownedCupSkinIds': ownedCupSkinIds,
       'ownedFrameIds': ownedFrameIds,
+      'nicknameChanges': nicknameChanges,
     };
   }
 
@@ -132,6 +139,7 @@ class UserModel {
       equippedFrameId: map['equippedFrameId'] as String? ?? 'frame_none',
       ownedCupSkinIds: (map['ownedCupSkinIds'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const ['cup_standard'],
       ownedFrameIds: (map['ownedFrameIds'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const ['frame_none'],
+      nicknameChanges: (map['nicknameChanges'] as num?)?.toInt() ?? 0,
     );
   }
 

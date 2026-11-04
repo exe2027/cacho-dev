@@ -15,6 +15,7 @@ class PlayerAvatarWidget extends StatefulWidget {
   final bool isEliminated;
   final Color? accentColor;
   final VoidCallback? onTap;
+  final String? avatarUrl;
 
   const PlayerAvatarWidget({
     super.key,
@@ -26,6 +27,7 @@ class PlayerAvatarWidget extends StatefulWidget {
     this.isEliminated = false,
     this.accentColor,
     this.onTap,
+    this.avatarUrl,
   });
 
   @override
@@ -115,16 +117,33 @@ class _PlayerAvatarWidgetState extends State<PlayerAvatarWidget>
                                 ],
                         ),
                         child: ClipOval(
-                          child: blobatar.Blobatar(
-                            name: widget.name,
-                            size: size,
-                            options: blobatar.BlobatarOptions(
-                              background: blobatar.Backdrop.circle,
-                              expression: widget.isEliminated
-                                  ? blobatar.sad
-                                  : (widget.isTurn ? blobatar.thinking : blobatar.happy),
-                            ),
-                          ),
+                          child: (widget.avatarUrl != null && widget.avatarUrl!.isNotEmpty)
+                              ? Image.network(
+                                  widget.avatarUrl!,
+                                  width: size,
+                                  height: size,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => blobatar.Blobatar(
+                                    name: widget.name,
+                                    size: size,
+                                    options: blobatar.BlobatarOptions(
+                                      background: blobatar.Backdrop.circle,
+                                      expression: widget.isEliminated
+                                          ? blobatar.sad
+                                          : (widget.isTurn ? blobatar.thinking : blobatar.happy),
+                                    ),
+                                  ),
+                                )
+                              : blobatar.Blobatar(
+                                  name: widget.name,
+                                  size: size,
+                                  options: blobatar.BlobatarOptions(
+                                    background: blobatar.Backdrop.circle,
+                                    expression: widget.isEliminated
+                                        ? blobatar.sad
+                                        : (widget.isTurn ? blobatar.thinking : blobatar.happy),
+                                  ),
+                                ),
                         ),
                       ),
                     ],

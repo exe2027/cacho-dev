@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../models/avatar_frame_model.dart';
 import '../models/cup_skin_model.dart';
 import '../models/shop_item_model.dart';
@@ -109,15 +109,27 @@ class _StoreScreenState extends State<StoreScreen>
           icon: const Icon(Icons.arrow_back_ios_new, color: CachoColors.gold, size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
-          'TIENDA & SKINS',
-          style: TextStyle(
-            fontFamily: 'Montserrat',
-            fontWeight: FontWeight.w800,
-            fontSize: 18,
-            letterSpacing: 1.2,
-            color: CachoColors.gold,
-          ),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'assets/images/logo_emblem.png',
+              height: 32,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'TIENDA & SKINS',
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontWeight: FontWeight.w800,
+                fontSize: 17,
+                letterSpacing: 1.2,
+                color: CachoColors.gold,
+              ),
+            ),
+          ],
         ),
         centerTitle: false,
         actions: [

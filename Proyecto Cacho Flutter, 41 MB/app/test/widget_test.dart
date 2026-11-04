@@ -1,4 +1,4 @@
-import 'package:cacho_app/screens/home_screen.dart';
+﻿import 'package:cacho_app/screens/home_screen.dart';
 import 'package:cacho_app/screens/how_to_play_screen.dart';
 import 'package:cacho_app/state/settings.dart';
 import 'package:cacho_app/theme.dart';
@@ -38,7 +38,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pump();
     expect(find.text('DUDO'), findsOneWidget);
-    expect(find.text('CACHO · EL DUDO CHILENO'), findsOneWidget);
+    expect(find.text('CACHO · EL DUDO'), findsOneWidget);
     expect(find.text('¿QUÉ TAN BUENO ERES MINTIENDO?'), findsOneWidget);
     expect(find.text('TU PRIMERA PARTIDA GUIADA'), findsOneWidget);
     expect(find.text('JUGAR CONTRA LA MÁQUINA'), findsOneWidget);

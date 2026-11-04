@@ -1,11 +1,11 @@
-{
-    "name": "Cacho · El Dudo Chileno",
+﻿{
+    "name": "Cacho · El Dudo",
     "short_name": "DUDO",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#120C09",
     "theme_color": "#C9A24B",
-    "description": "Cacho · El Dudo Chileno: miente, duda y calza en la mesa con tus amigos.",
+    "description": "Cacho · El Dudo: miente, duda y calza en la mesa con tus amigos.",
     "orientation": "any",
     "prefer_related_applications": false,
     "icons": [

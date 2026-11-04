@@ -13,8 +13,8 @@ import '../widgets/casino_anims.dart';
 import '../widgets/menu_transitions.dart';
 import '../table_themes.dart';
 import '../theme.dart';
-import '../widgets/dice_and_cup.dart';
-import '../widgets/store_showcase.dart';
+import '../widgets/game/player_avatar_widget.dart';
+import '../services/auth_service.dart';
 import '../state/app_viewport.dart';
 import '../widgets/rotate_notice.dart';
 import '../widgets/coin_widgets.dart';
@@ -462,200 +462,395 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _showPersonalize() {
-    final nickCtrl = TextEditingController(text: _s.nickname);
+    final user = UserService.instance.user;
+    final nickCtrl = TextEditingController(text: user.name.isNotEmpty ? user.name : _s.nickname);
+    String? statusMessage;
+    bool isStatusSuccess = true;
+
     showDialog<void>(
       context: context,
       builder: (dlgCtx) => StatefulBuilder(
-        builder: (dlgCtx, setDlg) => AlertDialog(
-          // Menú casino (25-oct): diálogo en azul noche, no cuero.
-          backgroundColor: CachoColors.menuTop,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: CachoColors.gold.withValues(alpha: 0.55)),
-          ),
-          title: const Text('PERSONALIZAR', style: titleStyle),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+        builder: (dlgCtx, setDlg) {
+          final currentUser = UserService.instance.user;
+          final isFreeChange = currentUser.nicknameChanges == 0;
+
+          return AlertDialog(
+            backgroundColor: CachoColors.menuTop,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: CachoColors.gold.withValues(alpha: 0.55), width: 1.5),
+            ),
+            titlePadding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            title: Row(
               children: [
-                TextField(
-                  controller: nickCtrl,
-                  maxLength: 12,
-                  onChanged: (v) {
-                    _s.nickname = v;
-                  },
-                  decoration: const InputDecoration(
-                    labelText: 'Apodo (así te ven en la mesa)',
-                    hintText: 'Ej: El Seba',
-                    counterText: '',
+                Image.asset(
+                  'assets/images/logo_emblem.png',
+                  height: 38,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(Icons.casino, color: CachoColors.gold, size: 28),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'PERFIL & CONFIGURACIÓN',
+                    style: TextStyle(
+                      fontFamily: CachoFonts.display,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: CachoColors.gold,
+                      letterSpacing: 1.0,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                const Text('Cuero de tu cacho',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    for (var i = 0; i < CachoColors.leatherChoices.length; i++)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 10),
-                        child: GestureDetector(
-                          onTap: () => setDlg(() => _s.leatherIndex = i),
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: CachoColors.leatherChoices.values
-                                  .elementAt(i),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: _s.leatherIndex == i
-                                    ? CachoColors.gold
-                                    : Colors.white24,
-                                width: _s.leatherIndex == i ? 2 : 1,
-                              ),
-                            ),
-                            child: _s.leatherIndex == i
-                                ? const Icon(Icons.check,
-                                    size: 18, color: CachoColors.gold)
-                                : null,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                Text(
-                  CachoColors.leatherChoices.keys.elementAt(_s.leatherIndex),
-                  style: const TextStyle(fontSize: 14, color: Colors.white60),
-                ),
-                const SizedBox(height: 8),
-                SwitchListTile(
-                  title: const Text('Sonidos'),
-                  value: _s.soundEffects,
-                  onChanged: (v) => setDlg(() => _s.soundEffects = v),
-                  activeColor: CachoColors.gold,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                SwitchListTile(
-                  title: const Text('Música de casino'),
-                  subtitle: const Text('Una canción de salón, en bucle',
-                      style: TextStyle(fontSize: 14)),
-                  value: _s.music,
-                  onChanged: (v) => setDlg(() => _s.music = v),
-                  activeColor: CachoColors.gold,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                SwitchListTile(
-                  title: const Text('Murmullo de fondo'),
-                  subtitle: const Text('El ambiente del casino, bajito',
-                      style: TextStyle(fontSize: 14)),
-                  value: _s.murmur,
-                  onChanged: (v) => setDlg(() => _s.murmur = v),
-                  activeColor: CachoColors.gold,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                SwitchListTile(
-                  title: const Text('Efectos reducidos'),
-                  subtitle: const Text('Menos animaciones y destellos',
-                      style: TextStyle(fontSize: 14)),
-                  value: _s.reducedEffects,
-                  onChanged: (v) => setDlg(() => _s.reducedEffects = v),
-                  activeColor: CachoColors.gold,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                // AN17: interruptor de animaciones de casino.
-                SwitchListTile(
-                  title: const Text('Animaciones'),
-                  subtitle: const Text('Telón, partículas y efectos de casino',
-                      style: TextStyle(fontSize: 14)),
-                  value: _s.animationsEnabled,
-                  onChanged: (v) => setDlg(() => _s.animationsEnabled = v),
-                  activeColor: CachoColors.gold,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                SwitchListTile(
-                  title: const Text('Ayuda para principiantes'),
-                  subtitle: const Text(
-                      'Muestra la probabilidad de tu apuesta al subir',
-                      style: TextStyle(fontSize: 14)),
-                  value: _s.beginnerHelp,
-                  onChanged: (v) => setDlg(() => _s.beginnerHelp = v),
-                  activeColor: CachoColors.gold,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                // R23/R48/R49 (rediseño): renglones de pantalla,
-                // solo en menús, debajo y separados. En
-                // escritorio/Android: botón real de pantalla
-                // completa; en iPhone: NINGÚN botón, solo el
-                // renglón exacto + añadir a inicio (función
-                // oficial de Safari). Se muestran porque R48/R49
-                // quedaron resueltos (puente + manifest + iconos).
-                if (appViewport.fullscreenEnabled) ...[
-                  const Divider(height: 24),
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text('Pantalla completa',
-                            style: TextStyle(fontSize: 14)),
-                      ),
-                      TextButton(
-                        style: TextButton.styleFrom(
-                            minimumSize: const Size(0, 44)),
-                        onPressed: () async {
-                          if (appViewport.isFullscreen) {
-                            appViewport.exitFullscreen();
-                          } else {
-                            appViewport.requestFullscreen();
-                          }
-                          await Future.delayed(
-                              const Duration(milliseconds: 300));
-                          if (dlgCtx.mounted) setDlg(() {});
-                        },
-                        child: Text(
-                          appViewport.isFullscreen ? 'Salir' : 'Activar',
-                          style: const TextStyle(
-                              fontSize: 14,
-                              color: CachoColors.gold,
-                              fontWeight: FontWeight.w800),
-                        ),
-                      ),
-                    ],
-                  ),
-                ] else if (appViewport.isIOS) ...[
-                  const Divider(height: 24),
-                  const Text(
-                    'En iPhone la pantalla completa de página no está permitida: el juego se ve completo sin ella.',
-                    style: TextStyle(fontSize: 14, color: Colors.white70),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Añadir a pantalla de inicio (opcional): función oficial de Safari — Compartir → Añadir a pantalla de inicio. No instala nada por fuera: crea un icono que abre la misma web (https://cacho.pages.dev) sin las barras del navegador.',
-                    style: TextStyle(fontSize: 14, color: Colors.white70),
-                  ),
-                ],
-                // D27–D30 (sentencia final): tienda PRESENTADA, no
-                // construida. Escaparate con bandas aprobadas, vista
-                // previa sin equipar sin pagar; sin compra, sin
-                // cobro, sin billeteras.
-                const StoreShowcase(),
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                await _s.save();
-                if (dlgCtx.mounted) Navigator.of(dlgCtx).pop();
-              },
-              child: const Text('LISTO',
-                  style: TextStyle(
-                      color: CachoColors.gold,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // --- SECCIÓN 1: PERFIL DEL JUGADOR ---
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF131A26),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: CachoColors.gold.withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            // Foto de Google con marco equipado
+                            PlayerAvatarWidget(
+                              name: currentUser.name,
+                              size: 48,
+                              level: currentUser.level,
+                              frame: UserService.instance.equippedFrame,
+                              avatarUrl: currentUser.avatarUrl.isNotEmpty ? currentUser.avatarUrl : null,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          currentUser.name,
+                                          style: const TextStyle(
+                                            fontFamily: 'Montserrat',
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 15,
+                                            color: Colors.white,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: currentUser.isGuest
+                                              ? Colors.white12
+                                              : const Color(0xFF4285F4).withValues(alpha: 0.25),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(
+                                            color: currentUser.isGuest
+                                                ? Colors.white24
+                                                : const Color(0xFF4285F4),
+                                            width: 0.8,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          currentUser.isGuest ? 'INVITADO' : 'GOOGLE',
+                                          style: TextStyle(
+                                            fontFamily: 'Montserrat',
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 9,
+                                            color: currentUser.isGuest ? Colors.white70 : const Color(0xFF8AB4F8),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'Nivel ${currentUser.level} · ${currentUser.coins} Monedas · \$${currentUser.cash} Cash',
+                                    style: const TextStyle(
+                                      fontFamily: 'Montserrat',
+                                      fontSize: 11,
+                                      color: CachoColors.gold,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Edición de apodo con lógica de pago (1er cambio gratis, 2do+ $500 Cash)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: nickCtrl,
+                                maxLength: 12,
+                                style: const TextStyle(color: Colors.white, fontSize: 14),
+                                decoration: InputDecoration(
+                                  labelText: 'Cambiar apodo',
+                                  labelStyle: const TextStyle(color: Colors.white70, fontSize: 13),
+                                  hintText: 'Ej: El Seba',
+                                  counterText: '',
+                                  helperText: isFreeChange
+                                      ? '1er cambio: ¡GRATIS!'
+                                      : 'Cambio: \$500 Cash (Tienes \$${currentUser.cash})',
+                                  helperStyle: TextStyle(
+                                    color: isFreeChange ? const Color(0xFF34C759) : Colors.amberAccent,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  filled: true,
+                                  fillColor: Colors.black26,
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(color: CachoColors.gold.withValues(alpha: 0.4)),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: CachoColors.gold, width: 1.5),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isFreeChange ? const Color(0xFF22C55E) : CachoColors.gold,
+                                foregroundColor: Colors.black,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onPressed: () async {
+                                final res = await UserService.instance.updateNickname(nickCtrl.text);
+                                setDlg(() {
+                                  statusMessage = res['message'] as String?;
+                                  isStatusSuccess = res['success'] as bool? ?? false;
+                                  if (isStatusSuccess) {
+                                    _s.nickname = nickCtrl.text.trim();
+                                    _s.save();
+                                  }
+                                });
+                              },
+                              child: Text(
+                                isFreeChange ? 'GRATIS' : '\$500',
+                                style: const TextStyle(
+                                  fontFamily: 'Montserrat',
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        if (statusMessage != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            statusMessage!,
+                            style: TextStyle(
+                              fontFamily: 'Montserrat',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isStatusSuccess ? const Color(0xFF34C759) : Colors.redAccent,
+                            ),
+                          ),
+                        ],
+
+                        // Botón vincular con Google si es invitado
+                        if (currentUser.isGuest) ...[
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.account_circle, size: 16, color: Color(0xFF4285F4)),
+                              label: const Text(
+                                'Vincular cuenta con Google',
+                                style: TextStyle(
+                                  fontFamily: 'Montserrat',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Color(0xFF4285F4), width: 1),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                              ),
+                              onPressed: () async {
+                                final ok = await AuthService.instance.signInWithGoogle();
+                                if (ok) {
+                                  setDlg(() {});
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // Cuero tradicional
+                  const Text('Cuero de tu cacho',
+                      style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      for (var i = 0; i < CachoColors.leatherChoices.length; i++)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: GestureDetector(
+                            onTap: () => setDlg(() => _s.leatherIndex = i),
+                            child: Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: CachoColors.leatherChoices.values.elementAt(i),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: _s.leatherIndex == i ? CachoColors.gold : Colors.white24,
+                                  width: _s.leatherIndex == i ? 2.5 : 1,
+                                ),
+                              ),
+                              child: _s.leatherIndex == i
+                                  ? const Icon(Icons.check, size: 18, color: CachoColors.gold)
+                                  : null,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  Text(
+                    CachoColors.leatherChoices.keys.elementAt(_s.leatherIndex),
+                    style: const TextStyle(fontSize: 13, color: Colors.white60),
+                  ),
+
+                  const Divider(height: 24, color: Colors.white12),
+
+                  // --- SECCIÓN 2: AJUSTES Y CONFIGURACIÓN ---
+                  SwitchListTile(
+                    title: const Text('Sonidos'),
+                    value: _s.soundEffects,
+                    onChanged: (v) => setDlg(() => _s.soundEffects = v),
+                    activeColor: CachoColors.gold,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  SwitchListTile(
+                    title: const Text('Música de casino'),
+                    subtitle: const Text('Una canción de salón, en bucle',
+                        style: TextStyle(fontSize: 13, color: Colors.white60)),
+                    value: _s.music,
+                    onChanged: (v) => setDlg(() => _s.music = v),
+                    activeColor: CachoColors.gold,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  SwitchListTile(
+                    title: const Text('Murmullo de fondo'),
+                    subtitle: const Text('El ambiente del casino, bajito',
+                        style: TextStyle(fontSize: 13, color: Colors.white60)),
+                    value: _s.murmur,
+                    onChanged: (v) => setDlg(() => _s.murmur = v),
+                    activeColor: CachoColors.gold,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  SwitchListTile(
+                    title: const Text('Efectos reducidos'),
+                    subtitle: const Text('Menos animaciones y destellos',
+                        style: TextStyle(fontSize: 13, color: Colors.white60)),
+                    value: _s.reducedEffects,
+                    onChanged: (v) => setDlg(() => _s.reducedEffects = v),
+                    activeColor: CachoColors.gold,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  SwitchListTile(
+                    title: const Text('Animaciones'),
+                    subtitle: const Text('Telón, partículas y efectos de casino',
+                        style: TextStyle(fontSize: 13, color: Colors.white60)),
+                    value: _s.animationsEnabled,
+                    onChanged: (v) => setDlg(() => _s.animationsEnabled = v),
+                    activeColor: CachoColors.gold,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  SwitchListTile(
+                    title: const Text('Ayuda para principiantes'),
+                    subtitle: const Text('Muestra la probabilidad de tu apuesta al subir',
+                        style: TextStyle(fontSize: 13, color: Colors.white60)),
+                    value: _s.beginnerHelp,
+                    onChanged: (v) => setDlg(() => _s.beginnerHelp = v),
+                    activeColor: CachoColors.gold,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+
+                  if (appViewport.fullscreenEnabled) ...[
+                    const Divider(height: 24, color: Colors.white12),
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text('Pantalla completa', style: TextStyle(fontSize: 14)),
+                        ),
+                        TextButton(
+                          style: TextButton.styleFrom(minimumSize: const Size(0, 44)),
+                          onPressed: () async {
+                            if (appViewport.isFullscreen) {
+                              appViewport.exitFullscreen();
+                            } else {
+                              appViewport.requestFullscreen();
+                            }
+                            await Future.delayed(const Duration(milliseconds: 300));
+                            if (dlgCtx.mounted) setDlg(() {});
+                          },
+                          child: Text(
+                            appViewport.isFullscreen ? 'Salir' : 'Activar',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: CachoColors.gold,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  await _s.save();
+                  if (dlgCtx.mounted) Navigator.of(dlgCtx).pop();
+                },
+                child: const Text(
+                  'LISTO',
+                  style: TextStyle(
+                    color: CachoColors.gold,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -888,7 +1083,7 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ),
                 const Text(
-                  'CACHO · EL DUDO CHILENO',
+                  'CACHO · EL DUDO',
                   style: TextStyle(
                     letterSpacing: 1.5,
                     fontSize: 8,

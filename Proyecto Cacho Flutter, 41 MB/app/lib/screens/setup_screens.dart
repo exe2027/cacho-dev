@@ -148,18 +148,32 @@ class SheetStrip extends StatelessWidget {
             onPressed: () => Navigator.of(context).pop(),
           ),
           Expanded(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontFamily: CachoFonts.display,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                  color: CachoColors.gold,
-                  letterSpacing: 1.5,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/images/logo_emblem.png',
+                  height: 26,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                 ),
-              ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontFamily: CachoFonts.display,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 18,
+                        color: CachoColors.gold,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           right ?? const SizedBox(width: 44),

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -39,7 +39,7 @@ class CachoApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Cacho · El Dudo Chileno',
+      title: 'Cacho · El Dudo',
       debugShowCheckedModeBanner: false,
       theme: buildCachoTheme(),
       navigatorObservers: [appRouteObserver],

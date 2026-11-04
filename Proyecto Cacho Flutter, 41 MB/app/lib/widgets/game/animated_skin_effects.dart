@@ -280,6 +280,221 @@ class _AnimatedCupVisualState extends State<AnimatedCupVisual>
                 ),
               ),
             );
+
+          // 8. VASO PIRATA BARBACOA
+          case CupShapeType.pirate:
+            return SizedBox(
+              width: w + 12,
+              height: h + 10,
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: w + 6,
+                    height: h + 4,
+                    decoration: BoxDecoration(
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFD4AF37).withValues(alpha: 0.5 + 0.25 * math.sin(t * 2 * math.pi)),
+                          blurRadius: 14,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                  CustomPaint(
+                    size: Size(w, h),
+                    painter: _PirateCupPainter(animationValue: t),
+                  ),
+                ],
+              ),
+            );
+
+          // 9. CÁLIZ DEL ARCHIMAGO
+          case CupShapeType.wizard:
+            return SizedBox(
+              width: w + 14,
+              height: h + 12,
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: w + 8,
+                    height: h + 6,
+                    decoration: BoxDecoration(
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFC084FC).withValues(alpha: 0.6 + 0.3 * math.sin(t * 2 * math.pi)),
+                          blurRadius: 16,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                  CustomPaint(
+                    size: Size(w, h),
+                    painter: _WizardCupPainter(animationValue: t),
+                  ),
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _ArcaneSparklesPainter(animationValue: t),
+                    ),
+                  ),
+                ],
+              ),
+            );
+
+          // 10. CUENCO DEL SHOGUN
+          case CupShapeType.samurai:
+            return SizedBox(
+              width: w + 12,
+              height: h + 10,
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: w + 6,
+                    height: h + 6,
+                    decoration: BoxDecoration(
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFEF4444).withValues(alpha: 0.55 + 0.25 * math.sin(t * 2 * math.pi)),
+                          blurRadius: 14,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                  CustomPaint(
+                    size: Size(w, h),
+                    painter: _SamuraiCupPainter(animationValue: t),
+                  ),
+                ],
+              ),
+            );
+
+          // 11. COPA BORGOÑA VINTAGE
+          case CupShapeType.wineCup:
+            return SizedBox(
+              width: w + 12,
+              height: h + 12,
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: w + 6,
+                    height: h + 6,
+                    decoration: BoxDecoration(
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFDC2626).withValues(alpha: 0.5 + 0.3 * math.sin(t * 2 * math.pi)),
+                          blurRadius: 14,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                  CustomPaint(
+                    size: Size(w, h),
+                    painter: _WineCupPainter(animationValue: t),
+                  ),
+                ],
+              ),
+            );
+
+          // 12. TÓTEM TIKI TROPICAL
+          case CupShapeType.tiki:
+            return SizedBox(
+              width: w + 12,
+              height: h + 12,
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: w + 6,
+                    height: h + 6,
+                    decoration: BoxDecoration(
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFF97316).withValues(alpha: 0.6 + 0.3 * math.sin(t * 2 * math.pi)),
+                          blurRadius: 15,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                  CustomPaint(
+                    size: Size(w, h),
+                    painter: _TikiCupPainter(animationValue: t),
+                  ),
+                ],
+              ),
+            );
+
+          // 13. DOMO MECHA CIBERNÉTICO
+          case CupShapeType.robot:
+            return SizedBox(
+              width: w + 12,
+              height: h + 10,
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: w + 6,
+                    height: h + 6,
+                    decoration: BoxDecoration(
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF06B6D4).withValues(alpha: 0.65 + 0.35 * math.sin(t * 2 * math.pi)),
+                          blurRadius: 16,
+                          spreadRadius: 2.5,
+                        ),
+                      ],
+                    ),
+                  ),
+                  CustomPaint(
+                    size: Size(w, h),
+                    painter: _RobotCupPainter(animationValue: t),
+                  ),
+                ],
+              ),
+            );
+
+          // 14. TRONCO ANCESTRAL DEL BOSQUE
+          case CupShapeType.natura:
+            return SizedBox(
+              width: w + 12,
+              height: h + 10,
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: w + 6,
+                    height: h + 6,
+                    decoration: BoxDecoration(
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.55 + 0.25 * math.sin(t * 2 * math.pi)),
+                          blurRadius: 14,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                  CustomPaint(
+                    size: Size(w, h),
+                    painter: _NaturaCupPainter(animationValue: t),
+                  ),
+                ],
+              ),
+            );
         }
       },
     );
@@ -1010,6 +1225,252 @@ class AnimatedFramePainter extends CustomPainter {
         final py = center.dy + (radius + 3) * math.sin(a);
         canvas.drawCircle(Offset(px, py), 2.2, crownPaint);
       }
+      return;
+    }
+
+    // 7. SANGRE Y FUEGO VAMPIRO
+    if (frame.effectType == 'sangre') {
+      final bloodShader = SweepGradient(
+        colors: const [
+          Color(0xFF881337),
+          Color(0xFFE11D48),
+          Color(0xFF4C0519),
+          Color(0xFFBE123C),
+          Color(0xFF881337),
+        ],
+        transform: GradientRotation(animationValue * 2 * math.pi),
+      ).createShader(Rect.fromCircle(center: center, radius: radius));
+
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..shader = bloodShader
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3.6
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+      );
+
+      final dropPaint = Paint()..color = const Color(0xFFFB7185)..style = PaintingStyle.fill;
+      for (int i = 0; i < 5; i++) {
+        final a = (i * 2 * math.pi / 5) + (animationValue * math.pi);
+        final px = center.dx + (radius + 2.5) * math.cos(a);
+        final py = center.dy + (radius + 2.5) * math.sin(a);
+        canvas.drawCircle(Offset(px, py), 2.0, dropPaint);
+      }
+      return;
+    }
+
+    // 8. ARCOÍRIS PRISMÁTICO
+    if (frame.effectType == 'arcoiris') {
+      final rainbowShader = SweepGradient(
+        colors: const [
+          Color(0xFFFF0055),
+          Color(0xFFFF9900),
+          Color(0xFFFFEE00),
+          Color(0xFF00FF66),
+          Color(0xFF00EEFF),
+          Color(0xFF9900FF),
+          Color(0xFFFF0055),
+        ],
+        transform: GradientRotation(animationValue * 2 * math.pi),
+      ).createShader(Rect.fromCircle(center: center, radius: radius));
+
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..shader = rainbowShader
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3.8
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+      );
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..shader = rainbowShader
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.4,
+      );
+      return;
+    }
+
+    // 9. SERPIENTE ESMERALDA
+    if (frame.effectType == 'serpiente') {
+      final snakeShader = SweepGradient(
+        colors: const [
+          Color(0xFF10B981),
+          Color(0xFF047857),
+          Color(0xFF34D399),
+          Color(0xFF064E3B),
+          Color(0xFF10B981),
+        ],
+        transform: GradientRotation(animationValue * 2 * math.pi),
+      ).createShader(Rect.fromCircle(center: center, radius: radius));
+
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..shader = snakeShader
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3.5
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+      );
+
+      final scalePaint = Paint()..color = const Color(0xFFA7F3D0)..style = PaintingStyle.fill;
+      for (int i = 0; i < 6; i++) {
+        final a = (i * math.pi / 3) + (animationValue * 2 * math.pi);
+        final px = center.dx + (radius + 2) * math.cos(a);
+        final py = center.dy + (radius + 2) * math.sin(a);
+        canvas.drawCircle(Offset(px, py), 1.8, scalePaint);
+      }
+      return;
+    }
+
+    // 10. TORMENTA ELÉCTRICA
+    if (frame.effectType == 'tormenta') {
+      final stormShader = SweepGradient(
+        colors: const [
+          Color(0xFF38BDF8),
+          Color(0xFF818CF8),
+          Color(0xFFE0E7FF),
+          Color(0xFF0284C7),
+          Color(0xFF38BDF8),
+        ],
+        transform: GradientRotation(animationValue * 4 * math.pi),
+      ).createShader(Rect.fromCircle(center: center, radius: radius));
+
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..shader = stormShader
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 4.0
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+      );
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.8,
+      );
+      return;
+    }
+
+    // 11. HOJA DEL BOSQUE
+    if (frame.effectType == 'hoja') {
+      final natureShader = SweepGradient(
+        colors: const [
+          Color(0xFF22C55E),
+          Color(0xFF86EFAC),
+          Color(0xFF15803D),
+          Color(0xFF22C55E),
+        ],
+        transform: GradientRotation(animationValue * 2 * math.pi),
+      ).createShader(Rect.fromCircle(center: center, radius: radius));
+
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..shader = natureShader
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3.2
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+      );
+
+      for (int i = 0; i < 4; i++) {
+        final a = (i * math.pi / 2) + (animationValue * math.pi);
+        final px = center.dx + (radius + 2.5) * math.cos(a);
+        final py = center.dy + (radius + 2.5) * math.sin(a);
+        _drawDiamond(canvas, Offset(px, py), 2.5, const Color(0xFF86EFAC));
+      }
+      return;
+    }
+
+    // 12. DIAMANTE CELESTIAL
+    if (frame.effectType == 'diamante') {
+      final diamondShader = SweepGradient(
+        colors: const [
+          Color(0xFFE0F2FE),
+          Color(0xFF38BDF8),
+          Color(0xFFFFFFFF),
+          Color(0xFF7DD3FC),
+          Color(0xFFE0F2FE),
+        ],
+        transform: GradientRotation(animationValue * 2 * math.pi),
+      ).createShader(Rect.fromCircle(center: center, radius: radius));
+
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..shader = diamondShader
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 4.2
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+      );
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.2,
+      );
+
+      for (int i = 0; i < 4; i++) {
+        final a = (i * math.pi / 2) + (animationValue * math.pi * 0.7);
+        final px = center.dx + (radius + 3) * math.cos(a);
+        final py = center.dy + (radius + 3) * math.sin(a);
+        _drawDiamond(canvas, Offset(px, py), 3.0, Colors.white);
+      }
+      return;
+    }
+
+    // 13. DUDO SUPREMO REAL
+    if (frame.effectType == 'dudo') {
+      final royalShader = SweepGradient(
+        colors: const [
+          Color(0xFFFFD700),
+          Color(0xFFFFA000),
+          Color(0xFFFFF8E1),
+          Color(0xFFFFB300),
+          Color(0xFFFFD700),
+        ],
+        transform: GradientRotation(animationValue * 2 * math.pi),
+      ).createShader(Rect.fromCircle(center: center, radius: radius));
+
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..shader = royalShader
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 4.5
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
+      );
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..color = const Color(0xFFFFD700)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.8,
+      );
+
+      for (int i = -2; i <= 2; i++) {
+        final a = -math.pi / 2 + (i * 0.22);
+        final px = center.dx + (radius + 3.5) * math.cos(a);
+        final py = center.dy + (radius + 3.5) * math.sin(a);
+        _drawDiamond(canvas, Offset(px, py), 2.8, Colors.white);
+      }
+      return;
     }
   }
 
@@ -1027,4 +1488,284 @@ class AnimatedFramePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant AnimatedFramePainter oldDelegate) =>
       oldDelegate.animationValue != animationValue || oldDelegate.frame.id != frame.id;
+}
+
+/// 8. Painter para Vaso Pirata (Madera oscura con zuncho dorado y moneda)
+class _PirateCupPainter extends CustomPainter {
+  final double animationValue;
+  _PirateCupPainter({required this.animationValue});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    final cupPath = Path()
+      ..moveTo(w * 0.2, h * 0.15)
+      ..lineTo(w * 0.8, h * 0.15)
+      ..lineTo(w * 0.72, h * 0.88)
+      ..lineTo(w * 0.28, h * 0.88)
+      ..close();
+
+    final woodPaint = Paint()
+      ..shader = LinearGradient(
+        colors: const [Color(0xFF2A1B0E), Color(0xFF140D07), Color(0xFF3E2723)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(Rect.fromLTWH(0, 0, w, h));
+    canvas.drawPath(cupPath, woodPaint);
+
+    final goldBand = Paint()
+      ..color = const Color(0xFFD4AF37)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0;
+    canvas.drawLine(Offset(w * 0.23, h * 0.5), Offset(w * 0.77, h * 0.5), goldBand);
+
+    final coinPaint = Paint()..color = const Color(0xFFFFD700);
+    canvas.drawCircle(Offset(w * 0.5, h * 0.5), 4.5, coinPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _PirateCupPainter oldDelegate) =>
+      oldDelegate.animationValue != animationValue;
+}
+
+/// 9. Painter para Cáliz del Archimago
+class _WizardCupPainter extends CustomPainter {
+  final double animationValue;
+  _WizardCupPainter({required this.animationValue});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    final cupPath = Path()
+      ..moveTo(w * 0.18, h * 0.15)
+      ..lineTo(w * 0.82, h * 0.15)
+      ..cubicTo(w * 0.80, h * 0.6, w * 0.62, h * 0.75, w * 0.55, h * 0.8)
+      ..lineTo(w * 0.55, h * 0.88)
+      ..lineTo(w * 0.7, h * 0.92)
+      ..lineTo(w * 0.3, h * 0.92)
+      ..lineTo(w * 0.45, h * 0.88)
+      ..lineTo(w * 0.45, h * 0.8)
+      ..cubicTo(w * 0.38, h * 0.75, w * 0.20, h * 0.6, w * 0.18, h * 0.15)
+      ..close();
+
+    final arcanePaint = Paint()
+      ..shader = LinearGradient(
+        colors: const [Color(0xFF6B21A8), Color(0xFF9333EA), Color(0xFF3B0764)],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ).createShader(Rect.fromLTWH(0, 0, w, h));
+    canvas.drawPath(cupPath, arcanePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _WizardCupPainter oldDelegate) =>
+      oldDelegate.animationValue != animationValue;
+}
+
+/// Destellos arcanos para el cáliz del archimago
+class _ArcaneSparklesPainter extends CustomPainter {
+  final double animationValue;
+  _ArcaneSparklesPainter({required this.animationValue});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height * 0.35;
+    final p = Paint()..color = const Color(0xFFE9D5FF);
+    for (int i = 0; i < 4; i++) {
+      final a = (i * math.pi / 2) + (animationValue * 2 * math.pi);
+      final r = 12.0 + math.sin(animationValue * 4 * math.pi + i) * 3.0;
+      canvas.drawCircle(Offset(cx + r * math.cos(a), cy + r * math.sin(a)), 1.8, p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ArcaneSparklesPainter oldDelegate) =>
+      oldDelegate.animationValue != animationValue;
+}
+
+/// 10. Painter para Cuenco del Shogun
+class _SamuraiCupPainter extends CustomPainter {
+  final double animationValue;
+  _SamuraiCupPainter({required this.animationValue});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    final cupPath = Path()
+      ..moveTo(w * 0.15, h * 0.22)
+      ..lineTo(w * 0.85, h * 0.22)
+      ..cubicTo(w * 0.82, h * 0.75, w * 0.68, h * 0.88, w * 0.32, h * 0.88)
+      ..cubicTo(w * 0.18, h * 0.75, w * 0.15, h * 0.22, w * 0.15, h * 0.22)
+      ..close();
+
+    final lacquerPaint = Paint()
+      ..shader = LinearGradient(
+        colors: const [Color(0xFF7F1D1D), Color(0xFFDC2626), Color(0xFF450A0A)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(Rect.fromLTWH(0, 0, w, h));
+    canvas.drawPath(cupPath, lacquerPaint);
+
+    final goldLine = Paint()..color = const Color(0xFFFFD700)..style = PaintingStyle.stroke..strokeWidth = 2.0;
+    canvas.drawLine(Offset(w * 0.2, h * 0.3), Offset(w * 0.8, h * 0.3), goldLine);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SamuraiCupPainter oldDelegate) =>
+      oldDelegate.animationValue != animationValue;
+}
+
+/// 11. Painter para Copa de Vino Vintage
+class _WineCupPainter extends CustomPainter {
+  final double animationValue;
+  _WineCupPainter({required this.animationValue});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    final glassPath = Path()
+      ..moveTo(w * 0.25, h * 0.15)
+      ..lineTo(w * 0.75, h * 0.15)
+      ..cubicTo(w * 0.8, h * 0.55, w * 0.58, h * 0.68, w * 0.53, h * 0.72)
+      ..lineTo(w * 0.53, h * 0.88)
+      ..lineTo(w * 0.68, h * 0.92)
+      ..lineTo(w * 0.32, h * 0.92)
+      ..lineTo(w * 0.47, h * 0.88)
+      ..lineTo(w * 0.47, h * 0.72)
+      ..cubicTo(w * 0.42, h * 0.68, w * 0.2, h * 0.55, w * 0.25, h * 0.15)
+      ..close();
+
+    final winePaint = Paint()
+      ..shader = LinearGradient(
+        colors: const [Color(0xFF991B1B), Color(0xFF7F1D1D), Color(0xFF450A0A)],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ).createShader(Rect.fromLTWH(0, 0, w, h));
+    canvas.drawPath(glassPath, winePaint);
+
+    final rimPaint = Paint()
+      ..color = const Color(0xFFFCA5A5).withValues(alpha: 0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas.drawPath(glassPath, rimPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _WineCupPainter oldDelegate) =>
+      oldDelegate.animationValue != animationValue;
+}
+
+/// 12. Painter para Tótem Tiki Tropical
+class _TikiCupPainter extends CustomPainter {
+  final double animationValue;
+  _TikiCupPainter({required this.animationValue});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    final bodyRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(w * 0.22, h * 0.15, w * 0.56, h * 0.75),
+      const Radius.circular(8),
+    );
+
+    final woodPaint = Paint()
+      ..shader = LinearGradient(
+        colors: const [Color(0xFF7C2D12), Color(0xFF431407), Color(0xFF9A3412)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(Rect.fromLTWH(0, 0, w, h));
+    canvas.drawRRect(bodyRect, woodPaint);
+
+    final eyePaint = Paint()..color = const Color(0xFFFB923C);
+    canvas.drawCircle(Offset(w * 0.38, h * 0.4), 3.0, eyePaint);
+    canvas.drawCircle(Offset(w * 0.62, h * 0.4), 3.0, eyePaint);
+
+    final mouthPaint = Paint()..color = const Color(0xFFEA580C)..style = PaintingStyle.stroke..strokeWidth = 2.0;
+    canvas.drawLine(Offset(w * 0.36, h * 0.65), Offset(w * 0.64, h * 0.65), mouthPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _TikiCupPainter oldDelegate) =>
+      oldDelegate.animationValue != animationValue;
+}
+
+/// 13. Painter para Domo Robótico
+class _RobotCupPainter extends CustomPainter {
+  final double animationValue;
+  _RobotCupPainter({required this.animationValue});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    final cupPath = Path()
+      ..moveTo(w * 0.22, h * 0.18)
+      ..lineTo(w * 0.78, h * 0.18)
+      ..lineTo(w * 0.72, h * 0.85)
+      ..lineTo(w * 0.28, h * 0.85)
+      ..close();
+
+    final metalPaint = Paint()
+      ..shader = LinearGradient(
+        colors: const [Color(0xFF334155), Color(0xFF64748B), Color(0xFF1E293B)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(Rect.fromLTWH(0, 0, w, h));
+    canvas.drawPath(cupPath, metalPaint);
+
+    final scanY = h * (0.35 + 0.3 * math.sin(animationValue * 2 * math.pi).abs());
+    final ledPaint = Paint()..color = const Color(0xFF06B6D4)..strokeWidth = 2.5;
+    canvas.drawLine(Offset(w * 0.32, scanY), Offset(w * 0.68, scanY), ledPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _RobotCupPainter oldDelegate) =>
+      oldDelegate.animationValue != animationValue;
+}
+
+/// 14. Painter para Tronco del Bosque
+class _NaturaCupPainter extends CustomPainter {
+  final double animationValue;
+  _NaturaCupPainter({required this.animationValue});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    final cupPath = Path()
+      ..moveTo(w * 0.24, h * 0.16)
+      ..lineTo(w * 0.76, h * 0.16)
+      ..lineTo(w * 0.71, h * 0.86)
+      ..lineTo(w * 0.29, h * 0.86)
+      ..close();
+
+    final barkPaint = Paint()
+      ..shader = LinearGradient(
+        colors: const [Color(0xFF064E3B), Color(0xFF065F46), Color(0xFF047857)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(Rect.fromLTWH(0, 0, w, h));
+    canvas.drawPath(cupPath, barkPaint);
+
+    final mossPaint = Paint()..color = const Color(0xFF34D399)..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(w * 0.4, h * 0.35), 3.0, mossPaint);
+    canvas.drawCircle(Offset(w * 0.6, h * 0.55), 2.5, mossPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _NaturaCupPainter oldDelegate) =>
+      oldDelegate.animationValue != animationValue;
 }

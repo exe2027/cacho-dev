@@ -10,7 +10,7 @@ class AvatarFrameModel {
   final Color primaryColor;
   final Color secondaryColor;
   final double borderWidth;
-  final String effectType; // 'none', 'gold', 'neon', 'fire', 'frost', 'galaxy', 'valhalla'
+  final String effectType;
 
   const AvatarFrameModel({
     required this.id,
@@ -23,6 +23,8 @@ class AvatarFrameModel {
     this.borderWidth = 1.5,
     this.effectType = 'none',
   });
+
+  // ── Marcos originales ───────────────────────────────────────────────────
 
   static const AvatarFrameModel none = AvatarFrameModel(
     id: 'frame_none',
@@ -106,6 +108,92 @@ class AvatarFrameModel {
     effectType: 'valhalla',
   );
 
+  // ── Marcos nuevos ───────────────────────────────────────────────────────
+
+  static const AvatarFrameModel sangre = AvatarFrameModel(
+    id: 'frame_sangre',
+    name: 'Pacto de Sangre',
+    description: 'Marco rojo oscuro con gotitas animadas que caen alrededor del avatar.',
+    priceCash: 800,
+    isAnimated: true,
+    primaryColor: Color(0xFFB71C1C),
+    secondaryColor: Color(0xFF7F0000),
+    borderWidth: 3.0,
+    effectType: 'sangre',
+  );
+
+  static const AvatarFrameModel arcoiris = AvatarFrameModel(
+    id: 'frame_arcoiris',
+    name: 'Prisma Festivo',
+    description: 'Arcoíris rotativo suave con colores vibrantes que nunca se detienen.',
+    priceCash: 600,
+    isAnimated: true,
+    primaryColor: Color(0xFFFF4081),
+    secondaryColor: Color(0xFF7C4DFF),
+    borderWidth: 2.8,
+    effectType: 'arcoiris',
+  );
+
+  static const AvatarFrameModel serpiente = AvatarFrameModel(
+    id: 'frame_serpiente',
+    name: 'Serpiente Emplumada',
+    description: 'Quetzalcóatl dorado y verde esmeralda que serpentea alrededor del avatar.',
+    priceCash: 1200,
+    isAnimated: true,
+    primaryColor: Color(0xFF00C853),
+    secondaryColor: Color(0xFFFFD600),
+    borderWidth: 3.0,
+    effectType: 'serpiente',
+  );
+
+  static const AvatarFrameModel tormenta = AvatarFrameModel(
+    id: 'frame_tormenta',
+    name: 'Ojo de la Tormenta',
+    description: 'Espiral de nubes oscuras con relámpagos que cruzan el marco sin parar.',
+    priceCash: 1400,
+    isAnimated: true,
+    primaryColor: Color(0xFF546E7A),
+    secondaryColor: Color(0xFFFFFF00),
+    borderWidth: 3.2,
+    effectType: 'tormenta',
+  );
+
+  static const AvatarFrameModel hoja = AvatarFrameModel(
+    id: 'frame_hoja',
+    name: 'Hoja de Otoño',
+    description: 'Hojas de colores cálidos que caen en bucle alrededor del avatar.',
+    priceCash: 700,
+    isAnimated: true,
+    primaryColor: Color(0xFFE65100),
+    secondaryColor: Color(0xFFBF360C),
+    borderWidth: 2.5,
+    effectType: 'hoja',
+  );
+
+  static const AvatarFrameModel diamante = AvatarFrameModel(
+    id: 'frame_diamante',
+    name: 'Diamante Azul',
+    description: 'Gemas de zafiro brillando en pulso rítmico con destellos de luz blanca.',
+    priceCash: 1600,
+    isAnimated: true,
+    primaryColor: Color(0xFF1565C0),
+    secondaryColor: Color(0xFF82B1FF),
+    borderWidth: 3.2,
+    effectType: 'diamante',
+  );
+
+  static const AvatarFrameModel dudo = AvatarFrameModel(
+    id: 'frame_dudo',
+    name: 'Corona del Dudo',
+    description: 'Corona dorada exclusiva de campeón con partículas reales que flotan arriba.',
+    priceCash: 2000,
+    isAnimated: true,
+    primaryColor: Color(0xFFFFC107),
+    secondaryColor: Color(0xFFFF8F00),
+    borderWidth: 3.5,
+    effectType: 'dudo',
+  );
+
   static const List<AvatarFrameModel> allFrames = [
     none,
     oro,
@@ -114,6 +202,13 @@ class AvatarFrameModel {
     frost,
     galaxy,
     valhalla,
+    sangre,
+    arcoiris,
+    serpiente,
+    tormenta,
+    hoja,
+    diamante,
+    dudo,
   ];
 
   static AvatarFrameModel getById(String? id) {

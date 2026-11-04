@@ -1,4 +1,4 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:cacho_app/models/user_model.dart';
 import 'package:cacho_app/models/cup_skin_model.dart';
 import 'package:cacho_app/models/avatar_frame_model.dart';
@@ -41,7 +41,7 @@ void main() {
     });
 
     test('CupSkinModel presets and getById', () {
-      expect(CupSkinModel.allSkins.length, 7);
+      expect(CupSkinModel.allSkins.length, 14);
       expect(CupSkinModel.getById('cup_standard').name, 'Cacho de Cuero Clásico');
       expect(CupSkinModel.getById('cup_chifle').shapeType, CupShapeType.chifle);
       expect(CupSkinModel.getById('cup_roble').priceCash, 180);
@@ -49,11 +49,13 @@ void main() {
       expect(CupSkinModel.getById('cup_fuego').priceCash, 500);
       expect(CupSkinModel.getById('cup_cyber').shapeType, CupShapeType.cyberPrism);
       expect(CupSkinModel.getById('cup_glaciar').shapeType, CupShapeType.crystalFrost);
+      expect(CupSkinModel.getById('cup_pirata').shapeType, CupShapeType.pirate);
+      expect(CupSkinModel.getById('cup_mago').shapeType, CupShapeType.wizard);
       expect(CupSkinModel.getById('unknown').id, CupSkinModel.standard.id);
     });
 
     test('AvatarFrameModel presets and getById', () {
-      expect(AvatarFrameModel.allFrames.length, 7);
+      expect(AvatarFrameModel.allFrames.length, 14);
       expect(AvatarFrameModel.getById('frame_none').name, 'Sin Marco');
       expect(AvatarFrameModel.getById('frame_oro').effectType, 'gold');
       expect(AvatarFrameModel.getById('frame_neon').effectType, 'neon');
@@ -61,6 +63,8 @@ void main() {
       expect(AvatarFrameModel.getById('frame_frost').effectType, 'frost');
       expect(AvatarFrameModel.getById('frame_galaxy').effectType, 'galaxy');
       expect(AvatarFrameModel.getById('frame_valhalla').effectType, 'valhalla');
+      expect(AvatarFrameModel.getById('frame_sangre').effectType, 'sangre');
+      expect(AvatarFrameModel.getById('frame_dudo').effectType, 'dudo');
       expect(AvatarFrameModel.getById('unknown').id, AvatarFrameModel.none.id);
     });
 
