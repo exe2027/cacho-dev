@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cacho_engine/cacho_engine.dart';
 import '../../models/room_config.dart';
 import '../../texts.dart';
+import '../../theme.dart';
 import '../dice_and_cup.dart';
 import 'player_slot_widget.dart';
 
@@ -35,8 +37,9 @@ const List<PremiumTableSlotCoordinate> kPremiumTableSlotCoordinates = [
 
 /// Widget Premium de Mesa 2D Cenital (Top-Down) estilo 8 Ball Pool / WSOP Poker.
 ///
-/// Muestra la apuesta activa como anuncio animado en el centro del paño verde,
-/// liberando espacio en el top bar (especialmente útil en móvil).
+/// - Logo del juego como marca de agua en el centro del paño.
+/// - Apuesta activa: anuncio animado que aparece al centro, dura 4 segundos y
+///   se desvanece automáticamente con fade-out suave.
 class PremiumTableWidget extends StatefulWidget {
   final RoomConfig roomConfig;
   final List<PlayerSlotData> slots;
@@ -61,25 +64,39 @@ class PremiumTableWidget extends StatefulWidget {
 
 class _PremiumTableWidgetState extends State<PremiumTableWidget>
     with SingleTickerProviderStateMixin {
+  /// Controlador único para toda la animación del chip (entrada + salida).
   late final AnimationController _bidAnim = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 350),
+    duration: const Duration(milliseconds: 400),
   );
+
+  /// Entrada: escala elástica
   late final Animation<double> _bidScale = CurvedAnimation(
     parent: _bidAnim,
     curve: Curves.elasticOut,
+    reverseCurve: Curves.easeInCubic,
   );
+
+  /// Entrada + salida: opacidad
   late final Animation<double> _bidOpacity = CurvedAnimation(
     parent: _bidAnim,
     curve: Curves.easeOut,
+    reverseCurve: Curves.easeInCubic,
   );
 
+  /// Timer que dispara el fade-out 4 segundos después de aparecer el chip.
+  Timer? _dismissTimer;
+
+  /// Última apuesta procesada (para detectar cambios).
   Bid? _prevBid;
 
   @override
   void initState() {
     super.initState();
-    if (widget.currentBid != null) _bidAnim.value = 1.0;
+    if (widget.currentBid != null) {
+      _bidAnim.value = 1.0;
+      _scheduleDismiss();
+    }
   }
 
   @override
@@ -89,16 +106,34 @@ class _PremiumTableWidgetState extends State<PremiumTableWidget>
     if (newBid != _prevBid) {
       _prevBid = newBid;
       if (newBid != null) {
-        // Nueva apuesta: animar entrada
+        // Nueva apuesta: cancelar timer anterior, animar entrada y programar salida
+        _dismissTimer?.cancel();
         _bidAnim.forward(from: 0.0);
+        _scheduleDismiss();
       } else {
+        // Sin apuesta: fade-out inmediato
+        _dismissTimer?.cancel();
         _bidAnim.reverse();
       }
     }
   }
 
+  /// Programa el fade-out automático a los 4 segundos.
+  void _scheduleDismiss() {
+    _dismissTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) {
+        _bidAnim.animateBack(
+          0.0,
+          duration: const Duration(milliseconds: 700),
+          curve: Curves.easeInCubic,
+        );
+      }
+    });
+  }
+
   @override
   void dispose() {
+    _dismissTimer?.cancel();
     _bidAnim.dispose();
     super.dispose();
   }
@@ -151,7 +186,6 @@ class _PremiumTableWidgetState extends State<PremiumTableWidget>
                       final canvasW = constraints.maxWidth;
                       final canvasH = constraints.maxHeight;
 
-                      // Priorizamos el asset de mesa configurado para la sala, con fallback a table_2d.png
                       final tableAsset = widget.roomConfig.tableAssetPath.isNotEmpty
                           ? widget.roomConfig.tableAssetPath
                           : 'assets/images/table_2d.png';
@@ -176,39 +210,56 @@ class _PremiumTableWidgetState extends State<PremiumTableWidget>
                             ),
                           ),
 
-                          // 2. Marca de agua del logo en el centro (semitransparente)
-                          //    Solo visible cuando no hay apuesta activa
-                          if (widget.currentBid == null)
-                            Center(
-                              child: Opacity(
-                                opacity: 0.13,
-                                child: Image.asset(
-                                  'assets/images/logo_emblem.png',
-                                  width: 72,
-                                  height: 72,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                                ),
-                              ),
-                            ),
-
-                          // 3. Anuncio de apuesta activa en el centro del paño
-                          if (widget.currentBid != null)
-                            Center(
-                              child: FadeTransition(
-                                opacity: _bidOpacity,
-                                child: ScaleTransition(
-                                  scale: _bidScale,
-                                  child: _BidAnnouncementChip(
-                                    bid: widget.currentBid!,
-                                    bidderName: widget.lastBidderName,
-                                    accentColor: widget.roomConfig.accentColor,
+                          // 2. Marca de agua: Logo "DUDO / CACHO" en el centro del paño
+                          Center(
+                            child: Opacity(
+                              opacity: 0.11,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const DudoLogo(fontSize: 34),
+                                  const SizedBox(height: 2),
+                                  const Text(
+                                    'CACHO · EL DUDO CHILENO',
+                                    style: TextStyle(
+                                      fontFamily: CachoFonts.display,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 2.0,
+                                      color: Colors.white,
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
                             ),
+                          ),
 
-                          // 4. Slots dinámicos de los 6 jugadores (avatares en riel, vasos dentro del paño)
+                          // 3. Anuncio de apuesta activa: aparece animado y desaparece a los 4s
+                          Center(
+                            child: AnimatedBuilder(
+                              animation: _bidAnim,
+                              builder: (context, _) {
+                                if (_bidAnim.value == 0.0) {
+                                  return const SizedBox.shrink();
+                                }
+                                return Opacity(
+                                  opacity: _bidOpacity.value,
+                                  child: Transform.scale(
+                                    scale: _bidScale.value.clamp(0.0, 1.05),
+                                    child: widget.currentBid != null
+                                        ? _BidAnnouncementChip(
+                                            bid: widget.currentBid!,
+                                            bidderName: widget.lastBidderName,
+                                            accentColor: widget.roomConfig.accentColor,
+                                          )
+                                        : const SizedBox.shrink(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+
+                          // 4. Slots dinámicos de los 6 jugadores
                           for (final slot in widget.slots)
                             if (slot.targetSlotIndex >= 0 &&
                                 slot.targetSlotIndex < kPremiumTableSlotCoordinates.length)
@@ -219,7 +270,7 @@ class _PremiumTableWidgetState extends State<PremiumTableWidget>
                                 slot,
                               ),
 
-                          // 5. Contenido overlay flotante (resolución / chat)
+                          // 5. Overlay flotante (resolución / chat)
                           if (widget.overlayChild != null) widget.overlayChild!,
                         ],
                       );
@@ -274,8 +325,8 @@ class _PremiumTableWidgetState extends State<PremiumTableWidget>
   }
 }
 
-/// Chip/anuncio de la apuesta activa que se muestra en el centro del paño.
-/// Estilo casino: fondo oscuro con borde dorado, cara del dado y texto de cantidad.
+/// Chip semi-transparente de la apuesta activa en el centro del paño.
+/// Fondo translúcido para que la mesa se vea a través del anuncio.
 class _BidAnnouncementChip extends StatelessWidget {
   final Bid bid;
   final String? bidderName;
@@ -294,24 +345,25 @@ class _BidAnnouncementChip extends StatelessWidget {
     final qty = bid.quantity;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1020).withValues(alpha: 0.88),
-        borderRadius: BorderRadius.circular(32),
+        // Fondo muy translúcido para que se vea la mesa detrás
+        color: const Color(0xFF05080F).withValues(alpha: 0.52),
+        borderRadius: BorderRadius.circular(36),
         border: Border.all(
-          color: accentColor.withValues(alpha: 0.85),
-          width: 1.5,
+          color: accentColor.withValues(alpha: 0.60),
+          width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: accentColor.withValues(alpha: 0.35),
-            blurRadius: 14,
-            spreadRadius: 1,
+            color: accentColor.withValues(alpha: 0.18),
+            blurRadius: 18,
+            spreadRadius: 2,
           ),
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.65),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+            color: Colors.black.withValues(alpha: 0.40),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -323,14 +375,14 @@ class _BidAnnouncementChip extends StatelessWidget {
             name,
             style: TextStyle(
               fontFamily: 'Montserrat',
-              fontSize: 9,
+              fontSize: 9.5,
               fontWeight: FontWeight.w600,
-              color: Colors.white.withValues(alpha: 0.65),
-              letterSpacing: 0.5,
+              color: Colors.white.withValues(alpha: 0.70),
+              letterSpacing: 0.6,
             ),
           ),
-          const SizedBox(height: 4),
-          // Fila principal: cantidad × dado (nombre)
+          const SizedBox(height: 5),
+          // Fila principal: cantidad × dado (nombre de cara)
           Row(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -339,32 +391,32 @@ class _BidAnnouncementChip extends StatelessWidget {
                 '$qty',
                 style: TextStyle(
                   fontFamily: 'Montserrat',
-                  fontSize: 22,
+                  fontSize: 26,
                   fontWeight: FontWeight.w900,
                   color: accentColor,
                   height: 1.0,
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: Text(
                   '×',
                   style: TextStyle(
                     fontFamily: 'Montserrat',
-                    fontSize: 14,
+                    fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: Colors.white.withValues(alpha: 0.55),
                   ),
                 ),
               ),
-              DiceFace(value: face, size: 26),
-              const SizedBox(width: 6),
+              DiceFace(value: face, size: 28),
+              const SizedBox(width: 8),
               Text(
                 facePlural(face),
                 style: const TextStyle(
                   fontFamily: 'Montserrat',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
                   color: Colors.white,
                 ),
               ),
