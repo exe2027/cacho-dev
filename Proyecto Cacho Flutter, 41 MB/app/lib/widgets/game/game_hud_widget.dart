@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/room_config.dart';
 import '../../state/wallet.dart';
-import '../../texts.dart';
 import '../coin_widgets.dart';
 import '../dice_and_cup.dart';
 
@@ -257,50 +256,6 @@ class GameHUDWidget extends StatelessWidget {
                     ),
                   ),
 
-                  // Apuesta Activa si existe
-                  if (currentBid != null) ...[
-                    const SizedBox(width: 8),
-                    Text(
-                      '\u2022',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.35),
-                        fontSize: 10,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${bidderName ?? "Jugada"}: ',
-                      style: const TextStyle(
-                        fontFamily: 'Montserrat',
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                    Text(
-                      '${currentBid!.quantity} \u00d7 ',
-                      style: TextStyle(
-                        fontFamily: 'Montserrat',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        color: roomConfig.accentColor,
-                      ),
-                    ),
-                    DiceFace(
-                      value: currentBid!.face,
-                      size: 13,
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                      '(${facePlural(currentBid!.face)})',
-                      style: TextStyle(
-                        fontFamily: 'Montserrat',
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white.withValues(alpha: 0.85),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),

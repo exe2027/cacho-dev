@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cacho_engine/cacho_engine.dart';
 import '../../models/room_config.dart';
+import '../../texts.dart';
+import '../dice_and_cup.dart';
 import 'player_slot_widget.dart';
 
 /// Coordenadas porcentuales para los 6 asientos sobre la mesa 2D Cenital:
@@ -33,11 +35,9 @@ const List<PremiumTableSlotCoordinate> kPremiumTableSlotCoordinates = [
 
 /// Widget Premium de Mesa 2D Cenital (Top-Down) estilo 8 Ball Pool / WSOP Poker.
 ///
-/// Refactorizado: Utiliza el asset fotorrealista 2D de la mesa como base visual
-/// y posiciona sobre ella de manera dinámica únicamente los 6 slots de jugadores
-/// con sus vasos dentro del paño verde. El centro de la mesa se mantiene 100% limpio
-/// sin textos ni información duplicada (la información vive en el TopBar).
-class PremiumTableWidget extends StatelessWidget {
+/// Muestra la apuesta activa como anuncio animado en el centro del paño verde,
+/// liberando espacio en el top bar (especialmente útil en móvil).
+class PremiumTableWidget extends StatefulWidget {
   final RoomConfig roomConfig;
   final List<PlayerSlotData> slots;
   final int pot;
@@ -56,6 +56,54 @@ class PremiumTableWidget extends StatelessWidget {
   });
 
   @override
+  State<PremiumTableWidget> createState() => _PremiumTableWidgetState();
+}
+
+class _PremiumTableWidgetState extends State<PremiumTableWidget>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _bidAnim = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 350),
+  );
+  late final Animation<double> _bidScale = CurvedAnimation(
+    parent: _bidAnim,
+    curve: Curves.elasticOut,
+  );
+  late final Animation<double> _bidOpacity = CurvedAnimation(
+    parent: _bidAnim,
+    curve: Curves.easeOut,
+  );
+
+  Bid? _prevBid;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.currentBid != null) _bidAnim.value = 1.0;
+  }
+
+  @override
+  void didUpdateWidget(PremiumTableWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final newBid = widget.currentBid;
+    if (newBid != _prevBid) {
+      _prevBid = newBid;
+      if (newBid != null) {
+        // Nueva apuesta: animar entrada
+        _bidAnim.forward(from: 0.0);
+      } else {
+        _bidAnim.reverse();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _bidAnim.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Stack(
       fit: StackFit.expand,
@@ -63,7 +111,7 @@ class PremiumTableWidget extends StatelessWidget {
         // 1. Fondo fotográfico ambiental de la sala privada
         Positioned.fill(
           child: Image.asset(
-            roomConfig.roomBackgroundAssetPath,
+            widget.roomConfig.roomBackgroundAssetPath,
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFF070503)),
           ),
@@ -96,60 +144,92 @@ class PremiumTableWidget extends StatelessWidget {
               child: SizedBox(
                 width: 844,
                 height: 390,
-              child: AspectRatio(
-                aspectRatio: 844 / 390,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final canvasW = constraints.maxWidth;
-                    final canvasH = constraints.maxHeight;
+                child: AspectRatio(
+                  aspectRatio: 844 / 390,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final canvasW = constraints.maxWidth;
+                      final canvasH = constraints.maxHeight;
 
-                    // Priorizamos el asset de mesa configurado para la sala, con fallback a table_2d.png
-                    final tableAsset = roomConfig.tableAssetPath.isNotEmpty
-                        ? roomConfig.tableAssetPath
-                        : 'assets/images/table_2d.png';
+                      // Priorizamos el asset de mesa configurado para la sala, con fallback a table_2d.png
+                      final tableAsset = widget.roomConfig.tableAssetPath.isNotEmpty
+                          ? widget.roomConfig.tableAssetPath
+                          : 'assets/images/table_2d.png';
 
-                    return Stack(
-                      clipBehavior: Clip.none,
-                      fit: StackFit.expand,
-                      children: [
-                        // 1. Asset 2D Realista de la Mesa (Fondo del paño con riel, bisel y fieltro)
-                        Center(
-                          child: Image.asset(
-                            tableAsset,
-                            width: 680.0,
-                            height: 376.0,
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => Image.asset(
-                              'assets/images/table_2d.png',
+                      return Stack(
+                        clipBehavior: Clip.none,
+                        fit: StackFit.expand,
+                        children: [
+                          // 1. Asset 2D Realista de la Mesa (paño con riel, bisel y fieltro)
+                          Center(
+                            child: Image.asset(
+                              tableAsset,
                               width: 680.0,
                               height: 376.0,
                               fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Image.asset(
+                                'assets/images/table_2d.png',
+                                width: 680.0,
+                                height: 376.0,
+                                fit: BoxFit.contain,
+                              ),
                             ),
                           ),
-                        ),
 
-                        // 2. Slots dinámicos de los 6 jugadores (avatares en riel, vasos dentro del paño)
-                        for (final slot in slots)
-                          if (slot.targetSlotIndex >= 0 &&
-                              slot.targetSlotIndex < kPremiumTableSlotCoordinates.length)
-                            _buildMountedPlayerSlot(
-                              canvasW,
-                              canvasH,
-                              slot.targetSlotIndex,
-                              slot,
+                          // 2. Marca de agua del logo en el centro (semitransparente)
+                          //    Solo visible cuando no hay apuesta activa
+                          if (widget.currentBid == null)
+                            Center(
+                              child: Opacity(
+                                opacity: 0.13,
+                                child: Image.asset(
+                                  'assets/images/logo_emblem.png',
+                                  width: 72,
+                                  height: 72,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                ),
+                              ),
                             ),
 
-                        // 3. Contenido overlay flotante (resolución / chat)
-                        if (overlayChild != null) overlayChild!,
-                      ],
-                    );
-                  },
+                          // 3. Anuncio de apuesta activa en el centro del paño
+                          if (widget.currentBid != null)
+                            Center(
+                              child: FadeTransition(
+                                opacity: _bidOpacity,
+                                child: ScaleTransition(
+                                  scale: _bidScale,
+                                  child: _BidAnnouncementChip(
+                                    bid: widget.currentBid!,
+                                    bidderName: widget.lastBidderName,
+                                    accentColor: widget.roomConfig.accentColor,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                          // 4. Slots dinámicos de los 6 jugadores (avatares en riel, vasos dentro del paño)
+                          for (final slot in widget.slots)
+                            if (slot.targetSlotIndex >= 0 &&
+                                slot.targetSlotIndex < kPremiumTableSlotCoordinates.length)
+                              _buildMountedPlayerSlot(
+                                canvasW,
+                                canvasH,
+                                slot.targetSlotIndex,
+                                slot,
+                              ),
+
+                          // 5. Contenido overlay flotante (resolución / chat)
+                          if (widget.overlayChild != null) widget.overlayChild!,
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
           ),
         ),
-      ),
       ],
     );
   }
@@ -189,6 +269,108 @@ class PremiumTableWidget extends StatelessWidget {
           micOn: data.micOn,
           onToggleMic: data.onToggleMic,
         ),
+      ),
+    );
+  }
+}
+
+/// Chip/anuncio de la apuesta activa que se muestra en el centro del paño.
+/// Estilo casino: fondo oscuro con borde dorado, cara del dado y texto de cantidad.
+class _BidAnnouncementChip extends StatelessWidget {
+  final Bid bid;
+  final String? bidderName;
+  final Color accentColor;
+
+  const _BidAnnouncementChip({
+    required this.bid,
+    required this.bidderName,
+    required this.accentColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final name = bidderName ?? 'Jugada';
+    final face = bid.face;
+    final qty = bid.quantity;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1020).withValues(alpha: 0.88),
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(
+          color: accentColor.withValues(alpha: 0.85),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withValues(alpha: 0.35),
+            blurRadius: 14,
+            spreadRadius: 1,
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.65),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Nombre del apostador
+          Text(
+            name,
+            style: TextStyle(
+              fontFamily: 'Montserrat',
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              color: Colors.white.withValues(alpha: 0.65),
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          // Fila principal: cantidad × dado (nombre)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                '$qty',
+                style: TextStyle(
+                  fontFamily: 'Montserrat',
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: accentColor,
+                  height: 1.0,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 5),
+                child: Text(
+                  '×',
+                  style: TextStyle(
+                    fontFamily: 'Montserrat',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white.withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
+              DiceFace(value: face, size: 26),
+              const SizedBox(width: 6),
+              Text(
+                facePlural(face),
+                style: const TextStyle(
+                  fontFamily: 'Montserrat',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

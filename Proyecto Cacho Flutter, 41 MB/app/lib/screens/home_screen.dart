@@ -844,33 +844,61 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ),
           const Spacer(),
-          // Centro: Marca y Slogans
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SweepGlow(child: const DudoLogo(fontSize: 16)),
-              Text(
-                '¿QUÉ TAN BUENO ERES MINTIENDO?',
-                style: TextStyle(
-                  letterSpacing: 1.2,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  height: 1.05,
-                  color: CachoColors.gold.withValues(alpha: 0.9),
+          // Centro: Emblema + Marca "DUDO" + Slogans
+          GestureDetector(
+            onTap: () {},
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Emblema dorado art-deco sobre el texto DUDO
+                SweepGlow(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Image.asset(
+                        'assets/images/logo_emblem.png',
+                        width: 26,
+                        height: 26,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
+                      const SizedBox(width: 6),
+                      const DudoLogo(fontSize: 20),
+                      const SizedBox(width: 6),
+                      Image.asset(
+                        'assets/images/logo_emblem.png',
+                        width: 26,
+                        height: 26,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const Text(
-                'CACHO · EL DUDO CHILENO',
-                style: TextStyle(
-                  letterSpacing: 1.5,
-                  fontSize: 8,
-                  fontWeight: FontWeight.w500,
-                  height: 1.05,
-                  color: Colors.white54,
+                Text(
+                  '¿QUÉ TAN BUENO ERES MINTIENDO?',
+                  style: TextStyle(
+                    letterSpacing: 1.2,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    height: 1.05,
+                    color: CachoColors.gold.withValues(alpha: 0.9),
+                  ),
                 ),
-              ),
-            ],
+                const Text(
+                  'CACHO · EL DUDO CHILENO',
+                  style: TextStyle(
+                    letterSpacing: 1.5,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w500,
+                    height: 1.05,
+                    color: Colors.white54,
+                  ),
+                ),
+              ],
+            ),
           ),
           const Spacer(),
           // Rescate disponible

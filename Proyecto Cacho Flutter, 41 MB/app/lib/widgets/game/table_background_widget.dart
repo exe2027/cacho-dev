@@ -79,7 +79,21 @@ class TableBackgroundWidget extends StatelessWidget {
                     ),
                   ),
 
-                  // 4. Contenido hijo (Gameplay Slots / fichas / dados)
+                  // 4. Marca de agua del logo DUDO en el centro del paño
+                  Center(
+                    child: Opacity(
+                      opacity: 0.14,
+                      child: Image.asset(
+                        'assets/images/logo_emblem.png',
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
+
+                  // 5. Contenido hijo (Gameplay Slots / fichas / dados)
                   if (child != null) child!,
                 ],
               ),
