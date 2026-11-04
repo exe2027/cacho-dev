@@ -25,6 +25,8 @@ import '../widgets/coin_widgets.dart';
 import '../widgets/music_sheet.dart';
 import '../widgets/yt_host.dart';
 import '../config/room_configs.dart';
+import '../services/user_service.dart';
+import '../widgets/game/star_level_badge.dart';
 import '../widgets/game/table_2d_layout_widget.dart';
 import '../widgets/game/premium_table_widget.dart';
 import '../widgets/game/player_slot_widget.dart';
@@ -98,6 +100,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   Timer? _emoteTimer;
   bool _wasBlind = false; // ya entré a la ceguera del Kamikaze
   int _dockDismissedAtEvents = -1;
+  Map<String, dynamic>? _matchLevelUpResult;
 
   // Mesa horizontal (sentencia mesa horizontal, prototipo local):
   // consola lateral plegable + apuesta armada compartida con la barra
@@ -371,10 +374,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       if (c.guided) {
         _s.markGuidedDone();
       }
-      if (c.winnerId == c.myId) {
+      final bool iWon = !c.isDraw && c.winnerId == c.myId;
+      if (iWon) {
         AudioService.instance.winFanfare();
         if (c.pot > 0 && !c.isDraw) AudioService.instance.coins();
       }
+      _matchLevelUpResult = UserService.instance.addMatchResult(won: iWon, stake: c.stake);
     }
     _prevPhase = c.phase;
     // Mi turno llega a mitad de ronda: suena la campana, pero el
@@ -3241,6 +3246,78 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               ],
               if (sub.isNotEmpty)
                 Text(sub, style: const TextStyle(fontSize: 14)),
+              if (_matchLevelUpResult != null) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E1712),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: (_matchLevelUpResult!['leveledUp'] == true)
+                          ? const Color(0xFFFFD700)
+                          : Colors.white24,
+                      width: 1.2,
+                    ),
+                    boxShadow: (_matchLevelUpResult!['leveledUp'] == true)
+                        ? const [
+                            BoxShadow(
+                              color: Color(0x66FFD700),
+                              blurRadius: 12,
+                              spreadRadius: 2,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          StarLevelBadge(
+                            level: _matchLevelUpResult!['newLevel'] as int,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '+${_matchLevelUpResult!['xpGained']} XP',
+                            style: const TextStyle(
+                              fontFamily: 'Montserrat',
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                              color: Color(0xFFFFD700),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_matchLevelUpResult!['leveledUp'] == true) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '¡SUBISTE AL NIVEL ${_matchLevelUpResult!['newLevel']}!',
+                          style: const TextStyle(
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.w900,
+                            fontSize: 14,
+                            color: Color(0xFFFFD700),
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Recompensas: +${_matchLevelUpResult!['rewardCash']} Billetes y +${_matchLevelUpResult!['rewardCoins']} Monedas',
+                          style: const TextStyle(
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                            color: Color(0xFF34C759),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 18),
               BronzeButton(label: 'VOLVER AL INICIO', onPressed: _exit),
               // B4 (sentencia v2.0): revancha SOLO en local, en un

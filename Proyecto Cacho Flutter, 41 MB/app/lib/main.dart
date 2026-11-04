@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'screens/home_screen.dart';
+import 'services/user_service.dart';
 import 'state/audio.dart';
 import 'state/route_observer.dart';
 import 'state/settings.dart';
@@ -11,6 +12,13 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Settings.instance.load();
   await Wallet.instance.load();
+  await UserService.instance.load();
+  // Sincronizar saldo de fichas entre Wallet y UserService
+  if (Wallet.instance.balance > 0 && UserService.instance.user.coins != Wallet.instance.balance) {
+    UserService.instance.updateProfile(
+      UserService.instance.user.copyWith(coins: Wallet.instance.balance),
+    );
+  }
   runApp(const CachoApp());
 }
 

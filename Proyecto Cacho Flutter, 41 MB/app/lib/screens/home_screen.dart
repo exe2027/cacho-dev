@@ -18,11 +18,14 @@ import '../widgets/store_showcase.dart';
 import '../state/app_viewport.dart';
 import '../widgets/rotate_notice.dart';
 import '../widgets/coin_widgets.dart';
+import '../services/user_service.dart';
+import '../widgets/game/star_level_badge.dart';
 import 'buscar_salas_screen.dart';
 import 'game_screen.dart';
 import 'how_to_play_screen.dart';
 import 'lobby_screen.dart';
 import 'setup_screens.dart';
+import 'store_screen.dart';
 
 /// Inicio SIN scroll (master prompt §7): logo, tres caminos claros y
 /// Personalizar. Apodo y cuero viven en Personalizar, ya rellenados.
@@ -85,6 +88,7 @@ class _HomeScreenState extends State<HomeScreen>
     _checkActiveRoom();
     _s.addListener(_refresh);
     Wallet.instance.addListener(_refresh);
+    UserService.instance.addListener(_refresh);
     WidgetsBinding.instance.addObserver(this);
     if (!_curtainShown && CasinoAnims.enabled) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -213,6 +217,7 @@ class _HomeScreenState extends State<HomeScreen>
     WidgetsBinding.instance.removeObserver(this);
     _s.removeListener(_refresh);
     Wallet.instance.removeListener(_refresh);
+    UserService.instance.removeListener(_refresh);
     _homeScroll.dispose();
     _joinCode.dispose();
     super.dispose();
@@ -754,42 +759,45 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ),
           const SizedBox(width: 8),
-          // Dinero virtual / billetes ($0)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.45),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                  color: const Color(0xFF34C759).withValues(alpha: 0.6)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.payments, size: 17, color: Color(0xFF34C759)),
-                const SizedBox(width: 6),
-                const Text(
-                  '\$0',
-                  style: TextStyle(
-                    fontFamily: CachoFonts.display,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF34C759),
+          // Dinero virtual / billetes (Cash)
+          GestureDetector(
+            onTap: () => pushMenuPage(context, builder: (_) => const StoreScreen(initialTabIndex: 0)),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                    color: const Color(0xFF34C759).withValues(alpha: 0.6)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.payments, size: 17, color: Color(0xFF34C759)),
+                  const SizedBox(width: 6),
+                  Text(
+                    '\$${UserService.instance.user.cash}',
+                    style: const TextStyle(
+                      fontFamily: CachoFonts.display,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF34C759),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  width: 18,
-                  height: 18,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF34C759),
-                    shape: BoxShape.circle,
+                  const SizedBox(width: 6),
+                  Container(
+                    width: 18,
+                    height: 18,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF34C759),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.add, size: 13, color: Colors.black),
+                    ),
                   ),
-                  child: const Center(
-                    child: Icon(Icons.add, size: 13, color: Colors.black),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           const Spacer(),
@@ -865,6 +873,13 @@ class _HomeScreenState extends State<HomeScreen>
                 ],
               ),
             ),
+          ),
+          // Botón Tienda & Cosméticos
+          IconButton(
+            icon: const Icon(Icons.storefront, color: CachoColors.gold, size: 23),
+            tooltip: 'TIENDA & COSMÉTICOS',
+            onPressed: () => pushMenuPage(context,
+                builder: (_) => const StoreScreen()),
           ),
           // Botón Reglas / Cómo se juega
           IconButton(
@@ -1684,23 +1699,36 @@ class _HomeScreenState extends State<HomeScreen>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: CachoColors.gold, width: 1.5),
-                    ),
-                    child: ClipOval(
-                      child: blobatar.Blobatar(
-                        name: _name,
-                        size: 32,
-                        options: const blobatar.BlobatarOptions(
-                          hue: 45.0,
-                          background: blobatar.Backdrop.circle,
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: CachoColors.gold, width: 1.5),
+                        ),
+                        child: ClipOval(
+                          child: blobatar.Blobatar(
+                            name: _name,
+                            size: 32,
+                            options: const blobatar.BlobatarOptions(
+                              hue: 45.0,
+                              background: blobatar.Backdrop.circle,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      Positioned(
+                        right: -3,
+                        bottom: -2,
+                        child: StarLevelBadge(
+                          level: UserService.instance.user.level,
+                          size: 14,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(width: 8),
                   Column(

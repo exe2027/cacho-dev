@@ -3,8 +3,12 @@ import '../panels.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../models/room_config.dart';
+import '../../models/avatar_frame_model.dart';
+import '../../models/cup_skin_model.dart';
+import '../../services/user_service.dart';
 import '../../theme.dart';
 import '../dice_and_cup.dart';
+import 'star_level_badge.dart';
 
 /// Coordenadas porcentuales relativas para los 6 asientos montados en el carril de la mesa:
 /// - Slot 0: Jugador Principal (Abajo Centro - 50% X, 80% Y) -> Vaso ARRIBA del avatar
@@ -163,9 +167,26 @@ class _PlayerSlotWidgetState extends State<PlayerSlotWidget>
       _diceRollCtrl.value = 1.0;
     }
 
+    if (widget.isLocalUser) {
+      UserService.instance.addListener(_onUserUpdated);
+    }
+
     _prevAction = widget.lastAction;
     _prevIsTurn = widget.isTurn;
     _prevShowDice = initialShowDice;
+  }
+
+  void _onUserUpdated() {
+    if (mounted) setState(() {});
+  }
+
+  int _resolvePlayerLevel() {
+    if (widget.isLocalUser) {
+      return UserService.instance.user.level;
+    }
+    final base = (widget.roomConfig.entryFee ~/ 100).clamp(2, 20);
+    final hash = widget.name.codeUnits.fold(0, (a, b) => a + b);
+    return (base + (hash % 6)).clamp(1, 99);
   }
 
   @override
@@ -204,6 +225,9 @@ class _PlayerSlotWidgetState extends State<PlayerSlotWidget>
 
   @override
   void dispose() {
+    if (widget.isLocalUser) {
+      UserService.instance.removeListener(_onUserUpdated);
+    }
     _cupShakeCtrl.dispose();
     _turnPulseCtrl.dispose();
     _pillCtrl.dispose();
@@ -349,7 +373,9 @@ class _PlayerSlotWidgetState extends State<PlayerSlotWidget>
   }
 
   Widget _buildAvatar() {
-    final avatarAsset = _resolveBotAvatar(widget.name, isLocalUser: widget.isLocalUser);
+    final frame = widget.isLocalUser
+        ? UserService.instance.equippedFrame
+        : AvatarFrameModel.none;
 
     return AnimatedBuilder(
       animation: _turnPulseCtrl,
@@ -358,8 +384,48 @@ class _PlayerSlotWidgetState extends State<PlayerSlotWidget>
         final glowSpread = widget.isTurn ? (3.0 + pulse * 5.0) : 0.0;
         final glowBlur = widget.isTurn ? (14.0 + pulse * 10.0) : 4.0;
 
+        Color borderColor = widget.isTurn ? widget.roomConfig.accentColor : Colors.white30;
+        double borderWidth = widget.isTurn ? 3.0 : 1.5;
+        List<BoxShadow> shadows = widget.isTurn
+            ? [
+                BoxShadow(
+                  color: widget.roomConfig.accentColor.withValues(alpha: 0.6 + pulse * 0.35),
+                  blurRadius: glowBlur,
+                  spreadRadius: glowSpread,
+                ),
+              ]
+            : const [
+                BoxShadow(
+                  color: Colors.black54,
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
+              ];
+
+        // Efectos del marco cosmético si está equipado
+        if (frame.effectType == 'gold') {
+          borderColor = const Color(0xFFFFD700);
+          borderWidth = 2.0;
+          shadows = [
+            const BoxShadow(color: Color(0x88FFD700), blurRadius: 8, spreadRadius: 1),
+          ];
+        } else if (frame.effectType == 'neon') {
+          borderColor = const Color(0xFF00F0FF);
+          borderWidth = 2.0;
+          shadows = [
+            const BoxShadow(color: Color(0x9900F0FF), blurRadius: 9, spreadRadius: 1.5),
+          ];
+        } else if (frame.effectType == 'fire') {
+          borderColor = const Color(0xFFFF4500);
+          borderWidth = 2.2;
+          shadows = [
+            const BoxShadow(color: Color(0xAAFF3300), blurRadius: 10, spreadRadius: 2),
+          ];
+        }
+
         return Stack(
           alignment: Alignment.center,
+          clipBehavior: Clip.none,
           children: [
             // Indicador de turno: Anillo temporizador con resplandor dorado
             if (widget.isTurn && widget.turnProgress != null)
@@ -382,24 +448,10 @@ class _PlayerSlotWidgetState extends State<PlayerSlotWidget>
                 shape: BoxShape.circle,
                 color: const Color(0xFF1B140E),
                 border: Border.all(
-                  color: widget.isTurn ? widget.roomConfig.accentColor : Colors.white30,
-                  width: widget.isTurn ? 3.0 : 1.5,
+                  color: borderColor,
+                  width: borderWidth,
                 ),
-                boxShadow: widget.isTurn
-                    ? [
-                        BoxShadow(
-                          color: widget.roomConfig.accentColor.withValues(alpha: 0.6 + pulse * 0.35),
-                          blurRadius: glowBlur,
-                          spreadRadius: glowSpread,
-                        ),
-                      ]
-                    : const [
-                        BoxShadow(
-                          color: Colors.black54,
-                          blurRadius: 4,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
+                boxShadow: shadows,
               ),
               child: ClipOval(
                 child: blobatar.Blobatar(
@@ -412,6 +464,16 @@ class _PlayerSlotWidgetState extends State<PlayerSlotWidget>
                         : (widget.isTurn ? blobatar.thinking : blobatar.happy),
                   ),
                 ),
+              ),
+            ),
+
+            // Star Level Badge en la esquina inferior derecha
+            Positioned(
+              right: -3,
+              bottom: -2,
+              child: StarLevelBadge(
+                level: _resolvePlayerLevel(),
+                size: 16,
               ),
             ),
           ],
@@ -491,6 +553,12 @@ class _PlayerSlotWidgetState extends State<PlayerSlotWidget>
   /// Renderizado del Cacho (vaso) y los dados con físicas de vuelco, rodadura y revelación.
   Widget _buildCupAndDice() {
     final bool showDice = (widget.isLocalUser && widget.isCupOpen) || widget.isRevealed;
+    final cupSkin = widget.isLocalUser
+        ? UserService.instance.equippedCupSkin
+        : CupSkinModel.standard;
+    final cupAsset = widget.isLocalUser
+        ? cupSkin.assetPath
+        : widget.roomConfig.cupAssetPath;
 
     // Vaso con elevación e inclinación física interactiva
     Widget cupVisual = AnimatedBuilder(
@@ -514,19 +582,32 @@ class _PlayerSlotWidgetState extends State<PlayerSlotWidget>
             alignment: Alignment.center,
             clipBehavior: Clip.none,
             children: [
-              // Imagen del vaso de cuero con sombra de profundidad
-              Image.asset(
-                widget.roomConfig.cupAssetPath,
-                width: 30,
-                height: 32,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) {
-                  return Icon(
-                    Icons.sports_bar,
-                    size: 26,
-                    color: widget.roomConfig.accentColor,
-                  );
-                },
+              // Imagen del vaso de cuero con skin equipada y brillo
+              Container(
+                decoration: cupSkin.isAnimated
+                    ? BoxDecoration(
+                        boxShadow: [
+                          BoxShadow(
+                            color: cupSkin.glowColor.withValues(alpha: 0.45),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      )
+                    : null,
+                child: Image.asset(
+                  cupAsset,
+                  width: 30,
+                  height: 32,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) {
+                    return Icon(
+                      Icons.sports_bar,
+                      size: 26,
+                      color: widget.roomConfig.accentColor,
+                    );
+                  },
+                ),
               ),
 
               // Puntos indicadores de dados restantes cuando está cerrado
