@@ -30,22 +30,22 @@ class DefaultFirebaseOptions {
   // Los encuentras en: Consola Firebase → Configuración del proyecto → Tus apps
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'TU_API_KEY_WEB',
-    appId: '1:000000000000:web:0000000000000000000000',
-    messagingSenderId: '000000000000',
-    projectId: 'TU-PROYECTO-ID',
-    authDomain: 'TU-PROYECTO-ID.firebaseapp.com',
-    storageBucket: 'TU-PROYECTO-ID.firebasestorage.app',
+    apiKey: 'AIzaSyBV1tWgqGX1XJWt7S2o39tY3J5d0CJZt9g',
+    appId: '1:462156623269:web:6956954b0e9ccf385b8c4c',
+    messagingSenderId: '462156623269',
+    projectId: 'cacho-e4a74',
+    authDomain: 'cacho-e4a74.firebaseapp.com',
+    storageBucket: 'cacho-e4a74.firebasestorage.app',
+    measurementId: 'G-87SBGVWN1N',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'TU_API_KEY_ANDROID',
-    appId: '1:000000000000:android:0000000000000000000000',
-    messagingSenderId: '000000000000',
-    projectId: 'TU-PROYECTO-ID',
-    storageBucket: 'TU-PROYECTO-ID.firebasestorage.app',
+    apiKey: 'AIzaSyD6U2mOgB4-OipW_tkwOHqWDaPfveJHeTQ',
+    appId: '1:462156623269:android:c15a3e71ccb77b035b8c4c',
+    messagingSenderId: '462156623269',
+    projectId: 'cacho-e4a74',
+    storageBucket: 'cacho-e4a74.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'TU_API_KEY_IOS',
     appId: '1:000000000000:ios:0000000000000000000000',

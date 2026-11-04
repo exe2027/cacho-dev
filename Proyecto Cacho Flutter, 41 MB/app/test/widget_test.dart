@@ -1,9 +1,25 @@
-import 'package:cacho_app/main.dart';
+import 'package:cacho_app/screens/home_screen.dart';
 import 'package:cacho_app/screens/how_to_play_screen.dart';
+import 'package:cacho_app/state/settings.dart';
+import 'package:cacho_app/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+// Wrapper mínimo para renderizar HomeScreen en tests
+// (evita _AuthGate que requiere Firebase inicializado)
+Widget _testApp(Widget home) => MaterialApp(
+      theme: buildCachoTheme(),
+      home: home,
+    );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('inicio sin scroll: marca, caminos y personalizar',
       (tester) async {
     // TODO-horizontal (26-oct): el home solo existe en horizontal; el
@@ -13,7 +29,9 @@ void main() {
     tester.view.physicalSize = const Size(2400, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(const CachoApp());
+
+    // Usar HomeScreen directamente (sin _AuthGate de Firebase)
+    await tester.pumpWidget(_testApp(const HomeScreen()));
     await tester.pump();
     // AN1: el telón de apertura (350 ms) muestra el logo una segunda
     // vez mientras está cerrado; al completarse solo queda el del home.

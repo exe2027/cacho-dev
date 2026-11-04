@@ -1,8 +1,16 @@
-import 'package:cacho_app/main.dart';
+import 'package:cacho_app/screens/home_screen.dart';
 import 'package:cacho_app/state/settings.dart';
+import 'package:cacho_app/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+// Wrapper mínimo para renderizar HomeScreen en tests
+// (evita _AuthGate que requiere Firebase inicializado)
+Widget _testApp() => MaterialApp(
+      theme: buildCachoTheme(),
+      home: const HomeScreen(),
+    );
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -19,7 +27,7 @@ void main() {
     // 1. Estado inicial: tutorial no completado
     Settings.instance.guidedDone = false;
 
-    await tester.pumpWidget(const CachoApp());
+    await tester.pumpWidget(_testApp());
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pump();

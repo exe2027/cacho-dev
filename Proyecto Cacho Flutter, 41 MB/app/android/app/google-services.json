@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "462156623269",
+    "project_id": "cacho-e4a74",
+    "storage_bucket": "cacho-e4a74.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:462156623269:android:a7bc4683487a26f55b8c4c",
+        "android_client_info": {
+          "package_name": "com.cacho.cachoapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "462156623269-r3ucb2jlb2fjfa2hu3jamem17n2lhdpj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD6U2mOgB4-OipW_tkwOHqWDaPfveJHeTQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "462156623269-r3ucb2jlb2fjfa2hu3jamem17n2lhdpj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:462156623269:android:c15a3e71ccb77b035b8c4c",
+        "android_client_info": {
+          "package_name": "com.example.cacho_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "462156623269-r3ucb2jlb2fjfa2hu3jamem17n2lhdpj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD6U2mOgB4-OipW_tkwOHqWDaPfveJHeTQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "462156623269-r3ucb2jlb2fjfa2hu3jamem17n2lhdpj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

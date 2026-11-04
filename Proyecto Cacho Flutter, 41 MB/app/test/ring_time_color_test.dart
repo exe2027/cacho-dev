@@ -1,4 +1,4 @@
-import 'package:cacho_app/theme.dart';
+﻿import 'package:cacho_app/theme.dart';
 import 'package:cacho_app/widgets/dice_and_cup.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -49,13 +49,17 @@ void main() {
   });
 
   group('isBeepSecond (pitidos de apuro)', () {
-    test('solo los últimos tres segundos', () {
-      expect(isBeepSecond(3), isTrue);
-      expect(isBeepSecond(2), isTrue);
-      expect(isBeepSecond(1), isTrue);
-      expect(isBeepSecond(4), isFalse);
+    test('solo en los segundos 13-15 (semáforo rojo)', () {
+      // Pitidos cuando el aro pasa a rojo: 15, 14, 13 segundos
+      expect(isBeepSecond(15), isTrue);
+      expect(isBeepSecond(14), isTrue);
+      expect(isBeepSecond(13), isTrue);
+      // Fuera del rango: no suenan
+      expect(isBeepSecond(16), isFalse);
+      expect(isBeepSecond(12), isFalse);
+      expect(isBeepSecond(3), isFalse);
+      expect(isBeepSecond(1), isFalse);
       expect(isBeepSecond(0), isFalse);
-      expect(isBeepSecond(-1), isFalse);
     });
   });
 }
